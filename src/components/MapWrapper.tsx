@@ -1,7 +1,6 @@
 "use client";
 
 import Map, { Marker, Popup, NavigationControl, GeolocateControl } from "react-map-gl/mapbox";
-import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Zap, MapPin, Store as StoreIcon, Clock, Navigation } from "lucide-react";
@@ -47,11 +46,12 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
     const [activeSession, setActiveSession] = useState<any>(null);
     const [isLocking, setIsLocking] = useState(false);
     const [isRevealed, setIsRevealed] = useState(false);
-    const [userLocation, setUserLocation] = useState<{ lat: number; long: number }>(PARIS_FALLBACK);
+    const [userLocation, setUserLocation] = useState<{ lat: number; long: number } | null>(null);
     const [arrivalTiming, setArrivalTiming] = useState(15);
 
-    const isComponentMounted = useRef(true);
+    // Safety refs to track search state and avoid infinite loops
     const lastExecutionRef = useRef<string>("");
+    const isComponentMounted = useRef(true);
     const activeRequestsRef = useRef(0);
 
     useEffect(() => {
@@ -59,94 +59,151 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         return () => { isComponentMounted.current = false; };
     }, []);
 
-    // 1. Robust Geolocation
+    // 1. Stable Geolocation
     useEffect(() => {
-        if (!navigator.geolocation) return;
+        if (!navigator.geolocation) {
+            setUserLocation(PARIS_FALLBACK);
+            return;
+        }
 
         const handleSuccess = (pos: GeolocationPosition) => {
             if (!isComponentMounted.current) return;
-            setUserLocation({ lat: pos.coords.latitude, long: pos.coords.longitude });
+            const { latitude, longitude } = pos.coords;
+            setUserLocation(prev => {
+                const hasSignificantDiff = !prev || Math.abs(prev.lat - latitude) > 0.001 || Math.abs(prev.long - longitude) > 0.001;
+                return hasSignificantDiff ? { lat: latitude, long: longitude } : prev;
+            });
+            setViewState(prev => (prev.latitude === PARIS_FALLBACK.lat ? { ...prev, latitude, longitude } : prev));
         };
 
         const handleError = (err: GeolocationPositionError) => {
             if (!isComponentMounted.current) return;
-            console.warn("[Geolocation] Fallback usage:", err.message);
+            console.warn("[Geolocation Logic] Error:", err.message);
+            setUserLocation(prev => prev || PARIS_FALLBACK);
         };
 
-        navigator.geolocation.getCurrentPosition(handleSuccess, handleError, { timeout: 3000 });
+        // Get initial position
+        navigator.geolocation.getCurrentPosition(handleSuccess, handleError, { timeout: 5000 });
+
+        // Watch for movements (low accuracy for battery/stability)
         const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
             enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 120000
+            timeout: 15000,
+            maximumAge: 60000
         });
 
         return () => navigator.geolocation.clearWatch(watchId);
     }, []);
 
-    // 2. Fetch Effect
+    // 2. Stabilized Fetch Effect
     useEffect(() => {
         let isEffectAlive = true;
+        const requestId = Math.random().toString(36).substring(7);
+
+        console.log(`[C2 Search][${requestId}] Effect initialized. Mapbox Token: ${!!MAPBOX_TOKEN}`);
 
         const fetchMerchants = async () => {
             if (!intentData?.category) {
+                console.log(`[C2 Search][${requestId}] No category, skipping.`);
                 onLoadingChange?.(false);
                 return;
             }
 
-            const lat = userLocation.lat;
-            const long = userLocation.long;
+            const lat = userLocation?.lat || PARIS_FALLBACK.lat;
+            const long = userLocation?.long || PARIS_FALLBACK.long;
             const currentParams = `${intentData.category}-${JSON.stringify(intentData.keywords)}-${lat.toFixed(3)}-${long.toFixed(3)}`;
 
+            // Safety Backup: Force unlock UI after 7 seconds no matter what
+            const safetyUnlock = setTimeout(() => {
+                if (isEffectAlive) {
+                    console.warn(`[C2 Search][${requestId}] Safety unlock triggered after 7s.`);
+                    onLoadingChange?.(false);
+                }
+            }, 7000);
+
+            // PROTECT: Don't search if params haven't changed and we already have results
             if (lastExecutionRef.current === currentParams && stores.length > 0) {
+                console.log(`[C2 Search][${requestId}] Params unchanged, skipping.`);
+                clearTimeout(safetyUnlock);
                 onLoadingChange?.(false);
                 return;
             }
 
-            onLoadingChange?.(true);
+            console.log(`[C2 Search][${requestId}] Request START: ${currentParams}`);
             activeRequestsRef.current += 1;
+            onLoadingChange?.(true);
 
             try {
-                const { data, error } = await supabase.rpc('api_v1_get_merchants', {
+                // RPC with 20s Timeout
+                const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
                     p_category: intentData.category,
                     p_keywords: intentData.keywords || []
                 });
 
-                if (isEffectAlive && data) {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("RPC Timeout 20s")), 20000)
+                );
+
+                const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as any;
+
+                if (!isEffectAlive || !isComponentMounted.current) {
+                    console.log(`[C2 Search][${requestId}] Request finished but component unmounted.`);
+                    return;
+                }
+
+                if (error) {
+                    console.error(`[C2 Search][${requestId}] RPC Error:`, error.message);
+                } else if (data) {
+                    console.log(`[C2 Search][${requestId}] RPC SUCCESS: ${data.length} stores.`);
                     setStores(data as Store[]);
                     lastExecutionRef.current = currentParams;
                 }
-            } catch (e) {
-                console.error("Fetch error:", e);
+            } catch (e: any) {
+                console.error(`[C2 Search][${requestId}] EXCEPTION:`, e.message);
             } finally {
+                clearTimeout(safetyUnlock);
                 activeRequestsRef.current = Math.max(0, activeRequestsRef.current - 1);
-                if (activeRequestsRef.current === 0) onLoadingChange?.(false);
+                console.log(`[C2 Search][${requestId}] Request FINISHED. Active requests: ${activeRequestsRef.current}`);
+
+                // Only signal 'false' if NO MORE requests are pending
+                if (activeRequestsRef.current === 0) {
+                    onLoadingChange?.(false);
+                }
             }
         };
 
         fetchMerchants();
         return () => { isEffectAlive = false; };
-    }, [intentData?.category, JSON.stringify(intentData?.keywords || []), userLocation.lat, userLocation.long]);
+        // We only re-trigger on CATEGORY/KEYWORDS changes or when location FIRST arrives
+    }, [intentData?.category, JSON.stringify(intentData?.keywords || []), !!userLocation]);
 
     const handleLock = async () => {
         if (!selectedStore) return;
         setIsLocking(true);
+
         const monetizationModel = selectedStore.business_type === 'service' ? 'commission' : 'subscription';
+
+        // CALL RPC instead of Server Action
         const { data, error } = await supabase.rpc('api_v1_create_session', {
             p_location_id: selectedStore.id,
             p_monetization_model: monetizationModel,
             p_arrival_timing_minutes: arrivalTiming
         });
+
         if (data?.session_id) {
             setActiveSession({ id: data.session_id });
         } else {
+            console.error("Lock error:", error);
             setIsLocking(false);
         }
     };
 
     const handleCancelLock = async () => {
-        if (activeSession) await supabase.from('sessions').update({ state: 'cancelled' }).eq('id', activeSession.id);
+        if (activeSession) {
+            await supabase.from('sessions').update({ state: 'cancelled' }).eq('id', activeSession.id);
+        }
         setActiveSession(null);
         setIsLocking(false);
         setIsRevealed(false);
@@ -162,7 +219,9 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
     };
 
     const handleArrival = async () => {
-        if (activeSession) await supabase.from('sessions').update({ state: 'completed' }).eq('id', activeSession.id);
+        if (activeSession) {
+            await supabase.from('sessions').update({ state: 'completed' }).eq('id', activeSession.id);
+        }
         setIsRevealed(false);
         setActiveSession(null);
         setSelectedStore(null);
@@ -173,14 +232,14 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
             <Map
                 {...viewState}
                 onMove={(evt) => setViewState(evt.viewState)}
-                style={{ width: "100%", height: "calc(100vh - 64px)" }}
+                style={{ width: "100%", height: "100%" }}
                 mapStyle="mapbox://styles/mapbox/dark-v11"
                 mapboxAccessToken={MAPBOX_TOKEN}
-                mapLib={mapboxgl}
             >
                 <GeolocateControl position="top-left" />
                 <NavigationControl position="top-left" />
 
+                {/* User Location */}
                 {userLocation && (
                     <Marker longitude={userLocation.long} latitude={userLocation.lat} anchor="bottom">
                         <div className="relative flex items-center justify-center h-16 w-16 group">
@@ -190,6 +249,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                     </Marker>
                 )}
 
+                {/* Store Markers */}
                 {stores.map((store) => (
                     <Marker
                         key={store.id}
@@ -253,6 +313,8 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                                             {selectedStore.business_type}
                                         </p>
                                     </div>
+
+                                    {/* Timing Selector */}
                                     <div className="flex flex-col gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
                                             <Clock size={12} />
@@ -270,6 +332,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                                             ))}
                                         </div>
                                     </div>
+
                                     <Button
                                         size="sm"
                                         className="w-full h-10 bg-black text-white hover:bg-slate-800 rounded-xl transition-all shadow-md flex items-center gap-2 group"

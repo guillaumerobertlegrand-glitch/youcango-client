@@ -32,7 +32,7 @@ serve(async (req) => {
             Règles :
             - Si le besoin concerne une personne ou un service pro (coiffeur, médecin, plombier), la catégorie est 'service'.
             - Si le besoin concerne un achat de produit physique (pain, fleurs, vêtements), la catégorie est 'merchant'.
-            - Réponds UNIQUEMENT avec le JSON, sans explications.`
+            - Réponds UNIQUEMENT with le JSON, sans explications.`
 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`
 

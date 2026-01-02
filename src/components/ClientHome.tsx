@@ -39,7 +39,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     }
 
     return (
-        <main className="flex min-h-screen flex-col bg-slate-50 relative overflow-hidden">
+        <main className="flex h-screen flex-col bg-slate-50 relative overflow-hidden">
             {/* Header */}
             <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="flex h-16 items-center justify-between px-4">
@@ -63,7 +63,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
             </header>
 
             {/* Map Area */}
-            <div className="flex-1 w-full bg-slate-900 overflow-hidden relative">
+            <div className="flex-1 w-full bg-slate-900 overflow-hidden h-full">
                 <MapWrapper intentData={intentData} onLoadingChange={handleLoadingChange} />
             </div>
 

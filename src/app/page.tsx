@@ -1,7 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
-import { redirect } from "next/navigation";
+import { Zap, ArrowRight, MapPin } from "lucide-react";
+import MapWrapper from "@/components/MapWrapper";
 import ClientHome from "@/components/ClientHome";
 import { checkProfileCompletion } from "@/utils/profile-check";
+import { redirect } from "next/navigation";
+import { signout } from "@/app/login/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -10,23 +13,23 @@ export default async function Home() {
 
   // Onboarding Check
   const isProfileComplete = await checkProfileCompletion();
-  if (isProfileComplete === false) {
+  if (isProfileComplete === false) { // Explicit false check (null means not logged in)
     redirect("/onboarding");
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // On récupère les magasins autour de Paris par défaut
-  const { data: stores } = await supabase.rpc('find_nearby_stores', {
+  // Test Logic: Fetch stores around Paris (Hardcoded for demo)
+  const { data: stores, error } = await supabase.rpc('find_nearby_stores', {
     search_lat: 48.8566,
     search_long: 2.3522,
     radius_meters: 50000
   });
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   return (
     <ClientHome
       initialStores={stores || []}
-      userEmail={user?.email || "demo-mode@test.com"}
+      userEmail={user?.email}
     />
   );
 }
