@@ -16,6 +16,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     const [step, setStep] = useState<'C1' | 'C2'>('C1');
     const [intentData, setIntentData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGuiding, setIsGuiding] = useState(false);
 
     const handleIntentCaptured = (data: any) => {
         console.log("[ClientHome] Intent captured:", data);
@@ -32,6 +33,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         setIntentData(null);
         setIsLoading(false);
         setStep('C1');
+        setIsGuiding(false);
     };
 
     if (step === 'C1') {
@@ -64,27 +66,33 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
 
             {/* Map Area */}
             <div className="flex-1 w-full bg-slate-900 overflow-hidden h-full">
-                <MapWrapper intentData={intentData} onLoadingChange={handleLoadingChange} />
+                <MapWrapper
+                    intentData={intentData}
+                    onLoadingChange={handleLoadingChange}
+                    onGuidanceStateChange={setIsGuiding}
+                />
             </div>
 
-            {/* Action Bar (Dynamic for C2) */}
-            <div className="absolute bottom-6 left-0 right-0 px-4 z-40">
-                <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl flex items-center p-4 shadow-xl text-slate-800 animate-in slide-in-from-bottom duration-500">
-                    <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                        {isLoading ? (
-                            <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-                        ) : (
-                            <Zap className="text-blue-600" size={20} />
-                        )}
-                    </div>
-                    <div>
-                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-0.5">
-                            {isLoading ? 'Recherche en cours...' : 'Recherche terminée'}
-                        </p>
-                        <p className="text-sm font-bold">"{intentData?.intent_summary || 'Chargement...'}"</p>
+            {/* Action Bar (Dynamic for C2) - Hidden during guidance */}
+            {!isGuiding && (
+                <div className="absolute bottom-6 left-0 right-0 px-4 z-40">
+                    <div className="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl flex items-center p-4 shadow-xl text-slate-800 animate-in slide-in-from-bottom duration-500">
+                        <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+                            {isLoading ? (
+                                <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
+                            ) : (
+                                <Zap className="text-blue-600" size={20} />
+                            )}
+                        </div>
+                        <div>
+                            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-0.5">
+                                {isLoading ? 'Recherche en cours...' : 'Recherche terminée'}
+                            </p>
+                            <p className="text-sm font-bold">"{intentData?.intent_summary || 'Chargement...'}"</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </main>
     );
 }

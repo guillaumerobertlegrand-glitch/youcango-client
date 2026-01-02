@@ -1,6 +1,6 @@
 "use client";
 
-import Map, { Marker, Popup, NavigationControl, GeolocateControl } from "react-map-gl/mapbox";
+import Map, { Marker, Popup, NavigationControl, GeolocateControl, Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Zap, MapPin, Store as StoreIcon, Clock, Navigation } from "lucide-react";
@@ -29,11 +29,12 @@ interface MapWrapperProps {
         primary_business_type: string;
     } | null;
     onLoadingChange?: (loading: boolean) => void;
+    onGuidanceStateChange?: (guiding: boolean) => void;
 }
 
 const PARIS_FALLBACK = { lat: 48.8566, long: 2.3522 };
 
-export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperProps) {
+export default function MapWrapper({ intentData, onLoadingChange, onGuidanceStateChange }: MapWrapperProps) {
     const supabase = createClient();
     const [viewState, setViewState] = useState({
         latitude: PARIS_FALLBACK.lat,
@@ -50,6 +51,8 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
     const [isRevealed, setIsRevealed] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number; long: number } | null>(null);
     const [arrivalTiming, setArrivalTiming] = useState(15);
+    const [routeData, setRouteData] = useState<any>(null);
+    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
 
     // Safety refs to track search state and avoid infinite loops
     const lastExecutionRef = useRef<string>("");
@@ -216,15 +219,18 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
 
     }, [stores, !!userLocation, !!mapRef.current]);
 
-    const handleLock = async () => {
-        if (!selectedStore) return;
-        setIsLocking(true);
+    const handleLock = async (storeToLock?: Store) => {
+        const targetStore = storeToLock || selectedStore;
+        if (!targetStore) return;
 
-        const monetizationModel = selectedStore.business_type === 'service' ? 'commission' : 'subscription';
+        setIsLocking(true);
+        if (storeToLock) setSelectedStore(storeToLock);
+
+        const monetizationModel = targetStore.business_type === 'service' ? 'commission' : 'subscription';
 
         // CALL RPC instead of Server Action
         const { data, error } = await supabase.rpc('api_v1_create_session', {
-            p_location_id: selectedStore.id,
+            p_location_id: targetStore.id,
             p_monetization_model: monetizationModel,
             p_arrival_timing_minutes: arrivalTiming
         });
@@ -234,6 +240,48 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         } else {
             console.error("Lock error:", error);
             setIsLocking(false);
+        }
+    };
+
+    const fetchRoute = async (start: [number, number], end: [number, number]) => {
+        if (!MAPBOX_TOKEN) return;
+        try {
+            const query = await fetch(
+                `https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?steps=true&geometries=geojson&access_token=${MAPBOX_TOKEN}`,
+                { method: 'GET' }
+            );
+            const json = await query.json();
+            if (json.routes && json.routes[0]) {
+                const data = json.routes[0];
+                setRouteData({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: data.geometry
+                });
+                setRouteInfo({
+                    distance: data.distance,
+                    duration: data.duration
+                });
+
+                // Fit bounds to the actual route
+                if (mapRef.current) {
+                    const coords = data.geometry.coordinates;
+                    const bounds = coords.reduce((acc: any, coord: any) => {
+                        return [
+                            [Math.min(acc[0][0], coord[0]), Math.min(acc[0][1], coord[1])],
+                            [Math.max(acc[1][0], coord[0]), Math.max(acc[1][1], coord[1])]
+                        ];
+                    }, [[coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]]);
+
+                    mapRef.current.fitBounds(bounds, {
+                        padding: { top: 80, bottom: 300, left: 50, right: 50 },
+                        duration: 2000,
+                        essential: true
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching directions:", error);
         }
     };
 
@@ -251,6 +299,11 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         if (activeSession) {
             await supabase.from('sessions').update({ state: 'pending' }).eq('id', activeSession.id);
             setIsRevealed(true);
+            onGuidanceStateChange?.(true);
+
+            if (userLocation && selectedStore) {
+                fetchRoute([userLocation.long, userLocation.lat], [selectedStore.long, selectedStore.lat]);
+            }
         }
         setIsLocking(false);
     };
@@ -262,6 +315,9 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         setIsRevealed(false);
         setActiveSession(null);
         setSelectedStore(null);
+        setRouteData(null);
+        setRouteInfo(null);
+        onGuidanceStateChange?.(false);
     };
 
     return (
@@ -287,91 +343,171 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                     </Marker>
                 )}
 
-                {/* Top 4 Store Markers (Rich UI) */}
-                {stores.slice(0, 4).map((store, index) => (
-                    <Marker
-                        key={store.id}
-                        latitude={store.lat}
-                        longitude={store.long}
-                        anchor="bottom"
-                        onClick={(e) => {
-                            e.originalEvent.stopPropagation();
-                            if (!isLocking) {
-                                setSelectedStore(store);
-                                handleLock();
-                            }
-                        }}
-                    >
-                        <div
-                            className={`flex items-center gap-2 p-1.5 rounded-full shadow-xl border-2 transition-all cursor-pointer hover:scale-105 active:scale-95 ${store.business_type === 'service'
-                                    ? 'bg-white border-purple-600'
-                                    : 'bg-white border-orange-500'
-                                }`}
+                {/* Store Markers - Hide others when revealed */}
+                {stores.slice(0, 4)
+                    .filter(s => !isRevealed || s.id === selectedStore?.id)
+                    .map((store, index) => (
+                        <Marker
+                            key={store.id}
+                            latitude={store.lat}
+                            longitude={store.long}
+                            anchor="bottom"
+                            onClick={(e) => {
+                                e.originalEvent.stopPropagation();
+                                if (!isLocking && !isRevealed) {
+                                    handleLock(store);
+                                }
+                            }}
                         >
-                            {/* Number Bubble */}
-                            <div className={`flex items-center justify-center h-8 w-8 rounded-full text-white font-bold text-sm shadow-inner ${store.business_type === 'service' ? 'bg-purple-600' : 'bg-orange-500'
-                                }`}>
-                                {index + 1}
-                            </div>
+                            {isRevealed ? (
+                                /* PINPOINT UI (Google Maps Style) */
+                                <div className="flex flex-col items-center group cursor-pointer transition-transform hover:scale-110">
+                                    <div className="bg-red-600 p-2 rounded-full shadow-2xl border-2 border-white animate-bounce-subtle">
+                                        <MapPin size={24} fill="white" className="text-white" />
+                                    </div>
+                                    <div className="mt-1 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-lg shadow-lg border border-slate-200">
+                                        <span className="text-[11px] font-black text-slate-800 uppercase leading-none truncate max-w-[120px] block">
+                                            {selectedStore?.name}
+                                        </span>
+                                    </div>
+                                    {/* Pin tip/shadow */}
+                                    <div className="w-1.5 h-1.5 bg-red-600 rounded-full -mt-1 shadow-sm border border-white"></div>
+                                </div>
+                            ) : (
+                                /* RICH MARKER UI (C2) */
+                                <div
+                                    className={`flex items-center gap-2 p-1.5 rounded-full shadow-xl border-2 transition-all cursor-pointer hover:scale-105 active:scale-95 ${store.business_type === 'service'
+                                        ? 'bg-white border-purple-600'
+                                        : 'bg-white border-orange-500'
+                                        }`}
+                                >
+                                    {/* Number Bubble */}
+                                    <div className={`flex items-center justify-center h-8 w-8 rounded-full text-white font-bold text-sm shadow-inner ${store.business_type === 'service' ? 'bg-purple-600' : 'bg-orange-500'
+                                        }`}>
+                                        {index + 1}
+                                    </div>
 
-                            {/* Info Section */}
-                            <div className="flex flex-col pr-2 min-w-[60px]">
-                                <span className="text-[10px] font-black uppercase tracking-tighter text-slate-800 leading-none">
-                                    {(store.category || store.business_type).charAt(0).toUpperCase() + (store.category || store.business_type).slice(1)}
-                                </span>
-                                <span className="text-[9px] font-bold text-slate-500">
-                                    {store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
-                                </span>
-                            </div>
-                        </div>
-                    </Marker>
-                ))}
+                                    {/* Info Section */}
+                                    <div className="flex flex-col pr-2 min-w-[60px]">
+                                        <span className="text-[10px] font-black uppercase tracking-tighter text-slate-800 leading-none">
+                                            {(store.category || store.business_type)}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-slate-500">
+                                            {store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </Marker>
+                    ))}
 
-                {/* Reveal Popup (Only after lock or arrival) */}
-                {selectedStore && (isLocking || isRevealed) && (
+                {/* Route Rendering */}
+                {routeData && (
+                    <Source id="route" type="geojson" data={routeData}>
+                        <Layer
+                            id="route-line"
+                            type="line"
+                            layout={{
+                                'line-join': 'round',
+                                'line-cap': 'round'
+                            }}
+                            paint={{
+                                'line-color': '#3b82f6',
+                                'line-width': 6,
+                                'line-opacity': 0.8
+                            }}
+                        />
+                    </Source>
+                )}
+
+                {/* Lock Popup (Only DURING locking animation) */}
+                {selectedStore && isLocking && !isRevealed && (
                     <Popup
                         longitude={selectedStore.long}
                         latitude={selectedStore.lat}
                         anchor="top"
                         onClose={() => {
-                            if (!isLocking && !isRevealed) setSelectedStore(null);
+                            if (!isLocking) setSelectedStore(null);
                         }}
                         closeButton={false}
                         className="z-50"
                         maxWidth="240px"
                     >
-                        <div className="p-4 min-w-[180px] text-center space-y-4">
-                            {isRevealed ? (
-                                <div className="space-y-3">
-                                    <div className="flex flex-col items-center">
-                                        <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-                                            <Navigation className="text-blue-600" size={24} />
-                                        </div>
-                                        <h3 className="font-bold text-lg text-slate-900">{selectedStore.name}</h3>
-                                        <p className="text-xs text-slate-500">{selectedStore.address}</p>
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-10 rounded-xl"
-                                        onClick={handleArrival}
-                                    >
-                                        Je suis arrivé !
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="py-4">
-                                    <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
-                                    <p className="text-xs font-bold text-blue-600 animate-pulse uppercase tracking-wider">Engagement en cours...</p>
-                                </div>
-                            )}
+                        <div className="p-4 min-w-[180px] text-center">
+                            <div className="py-4">
+                                <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+                                <p className="text-xs font-bold text-blue-600 animate-pulse uppercase tracking-wider">Engagement en cours...</p>
+                            </div>
                         </div>
                     </Popup>
                 )}
             </Map>
 
+            {/* C3 GUIDANCE UI OVERLAY - Chat Style Bubbles */}
+            {isRevealed && selectedStore && (
+                <div className="absolute inset-x-0 top-0 pointer-events-none flex flex-col items-center p-4 gap-3 pt-16 z-20">
+                    <div className="bg-white/95 backdrop-blur-sm px-5 py-2.5 rounded-2xl rounded-tl-none shadow-lg border border-slate-100 self-start ml-4 max-w-[80%] animate-in fade-in slide-in-from-left duration-500 pointer-events-auto">
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-tight">{(selectedStore.category || selectedStore.business_type)} - available now</span>
+                    </div>
+                    <div className="bg-blue-50/95 backdrop-blur-sm px-5 py-2.5 rounded-2xl rounded-tr-none shadow-lg border border-blue-100 self-end mr-4 max-w-[80%] animate-in fade-in slide-in-from-right duration-500 delay-300 pointer-events-auto">
+                        <span className="text-xs font-bold text-blue-800">{selectedStore.name.split(' ')[0]} is now waiting for you</span>
+                    </div>
+                    <div className="bg-green-50/95 backdrop-blur-sm px-5 py-2.5 rounded-2xl rounded-bl-none shadow-lg border border-green-100 self-start ml-4 max-w-[80%] animate-in fade-in slide-in-from-left duration-500 delay-700 pointer-events-auto">
+                        <span className="text-xs font-bold text-green-800">YouCanGo!</span>
+                    </div>
+                </div>
+            )}
+
+            {/* C3 BOTTOM DETAILS CARD - Cleaned up */}
+            {isRevealed && selectedStore && (
+                <div className="absolute inset-x-0 bottom-0 p-4 z-20 animate-in slide-in-from-bottom duration-500">
+                    <Card className="w-full bg-white border-0 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] rounded-[32px] overflow-hidden">
+                        <CardContent className="p-8">
+                            <div className="flex flex-col gap-6">
+                                <h4 className="text-xl font-black text-slate-900 leading-tight tracking-tight">
+                                    {selectedStore.name.split(' ')[0]} is expecting you — <span className="text-blue-600">
+                                        {routeInfo ? `${Math.ceil(routeInfo.duration / 60)} min` : '5 min'}
+                                    </span>
+                                    <div className="text-sm font-bold text-slate-400 mt-1">
+                                        {routeInfo ? (routeInfo.distance > 1000 ? `${(routeInfo.distance / 1000).toFixed(1)} km` : `${Math.round(routeInfo.distance)} m`) : '850m'} left
+                                    </div>
+                                </h4>
+
+                                <div className="flex items-center gap-5">
+                                    {/* Avatar */}
+                                    <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-slate-50 bg-slate-100 flex-shrink-0 shadow-sm">
+                                        <img
+                                            src="/Users/grl/.gemini/antigravity/brain/07fab0cb-c98f-4eda-8b66-d2a52d15c6e2/merchant_avatar_demo_1767368669315.png"
+                                            alt="Merchant"
+                                            className="h-full w-full object-cover"
+                                            onError={(e) => {
+                                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${selectedStore.name}&background=6366f1&color=fff&bold=true`;
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-black text-slate-900 truncate tracking-tight">{selectedStore.name}</h3>
+                                        <p className="text-sm text-slate-500 font-bold truncate opacity-80">{selectedStore.address}</p>
+                                        <p className="text-sm text-blue-500 font-bold mt-0.5 tracking-wide">+33 6 08 07 99 71</p>
+                                    </div>
+
+                                    <Button
+                                        onClick={handleArrival}
+                                        className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-200 flex items-center justify-center p-0 transition-all hover:scale-105 active:scale-95"
+                                    >
+                                        <Zap size={24} fill="white" className="text-white" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
             {isLocking && (
                 <LockTimer
-                    duration={60}
+                    duration={10}
                     onCancel={handleCancelLock}
                     onExpire={handleLockExpired}
                 />
