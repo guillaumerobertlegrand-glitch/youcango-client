@@ -174,11 +174,9 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                 {...viewState}
                 onMove={(evt) => setViewState(evt.viewState)}
                 style={{ width: "100%", height: "calc(100vh - 64px)" }}
-                mapStyle="mapbox://styles/mapbox/light-v11"
+                mapStyle="mapbox://styles/mapbox/dark-v11"
                 mapboxAccessToken={MAPBOX_TOKEN}
                 mapLib={mapboxgl}
-                onLoad={() => console.log("[MAP_LOAD_SUCCESS] Mapbox is ready!")}
-                onError={(e) => console.error("[Mapbox Error]", e.error)}
             >
                 <GeolocateControl position="top-left" />
                 <NavigationControl position="top-left" />

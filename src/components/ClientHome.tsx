@@ -63,7 +63,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
             </header>
 
             {/* Map Area */}
-            <div className="flex-1 w-full bg-white overflow-hidden relative">
+            <div className="flex-1 w-full bg-slate-900 overflow-hidden relative">
                 <MapWrapper intentData={intentData} onLoadingChange={handleLoadingChange} />
             </div>
 

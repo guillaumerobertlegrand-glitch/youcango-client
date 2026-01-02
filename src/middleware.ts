@@ -31,8 +31,6 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Example protection: if (!user && request.nextUrl.pathname.startsWith('/protected')) { return NextResponse.redirect(...) }
-
     return response
 }
 
