@@ -141,7 +141,8 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                     p_lat: lat,
                     p_long: long,
                     p_category: intentData.category,
-                    p_keywords: intentData.keywords || []
+                    p_keywords: intentData.keywords || [],
+                    p_specific_category: (intentData as any).extracted_category || null
                 });
 
                 const timeoutPromise = new Promise((_, reject) =>

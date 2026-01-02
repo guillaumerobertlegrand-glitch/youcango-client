@@ -21,9 +21,18 @@ serve(async (req) => {
             L'utilisateur dit : "${text}"
             Interprète son besoin et extrais les informations structurées au format JSON uniquement.
             
+            Catégories autorisées (choisis la plus proche) :
+            - "bakery" (pain, viennoiserie, pâtisserie)
+            - "restaurant" (manger, déjeuner, dîner)
+            - "hairdresser" (coiffeur, coupe, barbe)
+            - "beauty_salon" (soin, esthétique, massage)
+            - "grocery" (courses, supermarché, alimentation)
+            - "electronics" (réparation, téléphone, informatique)
+
             Format attendu :
             {
                 "category": "service" | "merchant",
+                "extracted_category": "une des catégories autorisées ci-dessus",
                 "keywords": ["mot1", "mot2"],
                 "intent_summary": "résumé court",
                 "primary_business_type": "type spécifique"
