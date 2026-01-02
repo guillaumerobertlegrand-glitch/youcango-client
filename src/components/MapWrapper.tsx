@@ -191,14 +191,17 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         const topOptions = stores.slice(0, 4);
         const maxDistMeters = Math.max(...topOptions.map(s => s.dist_meters || 0));
 
-        // Calculate ideal zoom
-        let idealZoom = 14.8;
-        if (maxDistMeters > 500) {
-            idealZoom = 15.2 - Math.log2(maxDistMeters / 500);
-        }
+        // Calculate ideal zoom: continuous formula for better sensitivity
+        // Zoom 17.5 ~= 85m radius | Zoom 15 ~= 500m radius | Zoom 13.5 ~= 1.5km radius
+        const referenceDist = 500;
+        const referenceZoom = 15;
 
-        const finalZoom = Math.min(Math.max(idealZoom, 11), 16.5);
-        console.log(`[C2 UX] Robust flying to zoom ${finalZoom.toFixed(1)} (max dist: ${Math.round(maxDistMeters)}m)`);
+        // Ensure maxDistMeters is at least 50m to avoid over-zooming
+        const effectiveDist = Math.max(maxDistMeters, 50);
+        const idealZoom = referenceZoom - Math.log2(effectiveDist / referenceDist);
+
+        const finalZoom = Math.min(Math.max(idealZoom, 11), 17.5);
+        console.log(`[C2 UX] Progressive flying to zoom ${finalZoom.toFixed(1)} (max dist: ${Math.round(maxDistMeters)}m)`);
 
         // Use flyTo for robust, direct control
         mapRef.current.flyTo({
@@ -298,11 +301,11 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                         <div className="cursor-pointer transition-transform hover:scale-110 relative group">
                             {store.business_type === 'service' ? (
                                 <div className="flex items-center justify-center h-10 w-10 rounded-full bg-purple-600 text-white shadow-lg border-2 border-white font-bold text-sm">
-                                    {String.fromCharCode(65 + index)}
+                                    {index + 1}
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-center h-10 w-10 rounded-full bg-orange-500 text-white shadow-lg border-2 border-white font-bold text-sm">
-                                    {String.fromCharCode(65 + index)}
+                                    {index + 1}
                                 </div>
                             )}
                         </div>
@@ -342,32 +345,14 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                                 <div className="space-y-3">
                                     <div>
                                         <h3 className="font-bold text-sm text-slate-900 italic">
-                                            Option {String.fromCharCode(65 + stores.findIndex(s => s.id === selectedStore.id))}
+                                            {(selectedStore.category || selectedStore.business_type).charAt(0).toUpperCase() + (selectedStore.category || selectedStore.business_type).slice(1)} {stores.findIndex(s => s.id === selectedStore.id) + 1}
                                         </h3>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
                                             {selectedStore.dist_meters ? `${Math.round(selectedStore.dist_meters)}m • ` : ''}
-                                            {selectedStore.category || selectedStore.business_type}
+                                            Disponible
                                         </p>
                                     </div>
 
-                                    {/* Timing Selector */}
-                                    <div className="flex flex-col gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
-                                            <Clock size={12} />
-                                            Timing d'arrivée
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-1">
-                                            {[15, 30, 45].map((t) => (
-                                                <button
-                                                    key={t}
-                                                    onClick={() => setArrivalTiming(t)}
-                                                    className={`py-1 text-xs rounded-md transition-all font-bold ${arrivalTiming === t ? 'bg-black text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
-                                                >
-                                                    {t}m
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
 
                                     <Button
                                         size="sm"
