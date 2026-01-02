@@ -42,6 +42,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
     });
 
     const [stores, setStores] = useState<Store[]>([]);
+    const [lastZoomedStoresId, setLastZoomedStoresId] = useState<string>("");
     const [selectedStore, setSelectedStore] = useState<Store | null>(null);
     const [activeSession, setActiveSession] = useState<any>(null);
     const [isLocking, setIsLocking] = useState(false);
@@ -179,6 +180,37 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         // We only re-trigger on CATEGORY/KEYWORDS changes or when location FIRST arrives
     }, [intentData?.category, JSON.stringify(intentData?.keywords || []), !!userLocation]);
 
+    // 3. Dynamic Zoom & Centering logic (Triggered ONCE per results set)
+    useEffect(() => {
+        if (stores.length === 0 || !userLocation) return;
+
+        // Create a unique ID for the current set of results to avoid re-zooming on GPS noise
+        const currentStoresId = stores.map(s => s.id).join(',');
+        if (lastZoomedStoresId === currentStoresId) return;
+
+        const topOptions = stores.slice(0, 4);
+        const maxDistMeters = Math.max(...topOptions.map(s => s.dist_meters || 0));
+
+        let idealZoom = 14.5;
+        if (maxDistMeters > 500) {
+            idealZoom = 15 - Math.log2(maxDistMeters / 500);
+        }
+
+        const finalZoom = Math.min(Math.max(idealZoom, 11), 16);
+        console.log(`[C2 UX] Auto-zooming to ${finalZoom.toFixed(1)} based on max distance ${Math.round(maxDistMeters)}m`);
+
+        setViewState(prev => ({
+            ...prev,
+            latitude: userLocation.lat,
+            longitude: userLocation.long,
+            zoom: finalZoom,
+            transitionDuration: 1000
+        }));
+
+        setLastZoomedStoresId(currentStoresId);
+
+    }, [stores, !!userLocation]);
+
     const handleLock = async () => {
         if (!selectedStore) return;
         setIsLocking(true);
@@ -250,7 +282,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                 )}
 
                 {/* Store Markers */}
-                {stores.map((store) => (
+                {stores.map((store, index) => (
                     <Marker
                         key={store.id}
                         longitude={store.long}
@@ -261,14 +293,14 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                             setSelectedStore(store);
                         }}
                     >
-                        <div className="cursor-pointer transition-transform hover:scale-110">
+                        <div className="cursor-pointer transition-transform hover:scale-110 relative group">
                             {store.business_type === 'service' ? (
-                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-purple-600 text-white shadow-lg border-2 border-white">
-                                    <Zap size={16} fill="currentColor" />
+                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-purple-600 text-white shadow-lg border-2 border-white font-bold text-sm">
+                                    {String.fromCharCode(65 + index)}
                                 </div>
                             ) : (
-                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-orange-500 text-white shadow-lg border-2 border-white">
-                                    <StoreIcon size={16} />
+                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-orange-500 text-white shadow-lg border-2 border-white font-bold text-sm">
+                                    {String.fromCharCode(65 + index)}
                                 </div>
                             )}
                         </div>
@@ -307,10 +339,12 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                             ) : !isLocking ? (
                                 <div className="space-y-3">
                                     <div>
-                                        <h3 className="font-bold text-sm text-slate-900">{selectedStore.name}</h3>
+                                        <h3 className="font-bold text-sm text-slate-900 italic">
+                                            Option {String.fromCharCode(65 + stores.findIndex(s => s.id === selectedStore.id))}
+                                        </h3>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
                                             {selectedStore.dist_meters ? `${Math.round(selectedStore.dist_meters)}m • ` : ''}
-                                            {selectedStore.business_type}
+                                            {selectedStore.category || selectedStore.business_type}
                                         </p>
                                     </div>
 
