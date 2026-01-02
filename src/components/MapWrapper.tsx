@@ -287,33 +287,48 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                     </Marker>
                 )}
 
-                {/* Store Markers */}
-                {stores.map((store, index) => (
+                {/* Top 4 Store Markers (Rich UI) */}
+                {stores.slice(0, 4).map((store, index) => (
                     <Marker
                         key={store.id}
-                        longitude={store.long}
                         latitude={store.lat}
+                        longitude={store.long}
                         anchor="bottom"
                         onClick={(e) => {
                             e.originalEvent.stopPropagation();
-                            setSelectedStore(store);
+                            if (!isLocking) {
+                                setSelectedStore(store);
+                                handleLock();
+                            }
                         }}
                     >
-                        <div className="cursor-pointer transition-transform hover:scale-110 relative group">
-                            {store.business_type === 'service' ? (
-                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-purple-600 text-white shadow-lg border-2 border-white font-bold text-sm">
-                                    {index + 1}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-orange-500 text-white shadow-lg border-2 border-white font-bold text-sm">
-                                    {index + 1}
-                                </div>
-                            )}
+                        <div
+                            className={`flex items-center gap-2 p-1.5 rounded-full shadow-xl border-2 transition-all cursor-pointer hover:scale-105 active:scale-95 ${store.business_type === 'service'
+                                    ? 'bg-white border-purple-600'
+                                    : 'bg-white border-orange-500'
+                                }`}
+                        >
+                            {/* Number Bubble */}
+                            <div className={`flex items-center justify-center h-8 w-8 rounded-full text-white font-bold text-sm shadow-inner ${store.business_type === 'service' ? 'bg-purple-600' : 'bg-orange-500'
+                                }`}>
+                                {index + 1}
+                            </div>
+
+                            {/* Info Section */}
+                            <div className="flex flex-col pr-2 min-w-[60px]">
+                                <span className="text-[10px] font-black uppercase tracking-tighter text-slate-800 leading-none">
+                                    {(store.category || store.business_type).charAt(0).toUpperCase() + (store.category || store.business_type).slice(1)}
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-500">
+                                    {store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
+                                </span>
+                            </div>
                         </div>
                     </Marker>
                 ))}
 
-                {selectedStore && (
+                {/* Reveal Popup (Only after lock or arrival) */}
+                {selectedStore && (isLocking || isRevealed) && (
                     <Popup
                         longitude={selectedStore.long}
                         latitude={selectedStore.lat}
@@ -323,8 +338,9 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                         }}
                         closeButton={false}
                         className="z-50"
+                        maxWidth="240px"
                     >
-                        <div className="p-4 min-w-[220px] text-center space-y-4">
+                        <div className="p-4 min-w-[180px] text-center space-y-4">
                             {isRevealed ? (
                                 <div className="space-y-3">
                                     <div className="flex flex-col items-center">
@@ -340,28 +356,6 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
                                         onClick={handleArrival}
                                     >
                                         Je suis arrivé !
-                                    </Button>
-                                </div>
-                            ) : !isLocking ? (
-                                <div className="space-y-3">
-                                    <div>
-                                        <h3 className="font-bold text-sm text-slate-900 italic">
-                                            {(selectedStore.category || selectedStore.business_type).charAt(0).toUpperCase() + (selectedStore.category || selectedStore.business_type).slice(1)} {stores.findIndex(s => s.id === selectedStore.id) + 1}
-                                        </h3>
-                                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
-                                            {selectedStore.dist_meters ? `${Math.round(selectedStore.dist_meters)}m • ` : ''}
-                                            Disponible
-                                        </p>
-                                    </div>
-
-
-                                    <Button
-                                        size="sm"
-                                        className="w-full h-10 bg-black text-white hover:bg-slate-800 rounded-xl transition-all shadow-md flex items-center gap-2 group"
-                                        onClick={handleLock}
-                                    >
-                                        <Zap size={14} className="group-hover:animate-pulse" />
-                                        <span>Lock Destination</span>
                                     </Button>
                                 </div>
                             ) : (
