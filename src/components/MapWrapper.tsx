@@ -43,6 +43,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
 
     const [stores, setStores] = useState<Store[]>([]);
     const [lastZoomedStoresId, setLastZoomedStoresId] = useState<string>("");
+    const mapRef = useRef<any>(null);
     const [selectedStore, setSelectedStore] = useState<Store | null>(null);
     const [activeSession, setActiveSession] = useState<any>(null);
     const [isLocking, setIsLocking] = useState(false);
@@ -182,34 +183,34 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
 
     // 3. Dynamic Zoom & Centering logic (Triggered ONCE per results set)
     useEffect(() => {
-        if (stores.length === 0 || !userLocation) return;
+        if (stores.length === 0 || !userLocation || !mapRef.current) return;
 
-        // Create a unique ID for the current set of results to avoid re-zooming on GPS noise
         const currentStoresId = stores.map(s => s.id).join(',');
         if (lastZoomedStoresId === currentStoresId) return;
 
         const topOptions = stores.slice(0, 4);
         const maxDistMeters = Math.max(...topOptions.map(s => s.dist_meters || 0));
 
-        let idealZoom = 14.5;
+        // Calculate ideal zoom
+        let idealZoom = 14.8;
         if (maxDistMeters > 500) {
-            idealZoom = 15 - Math.log2(maxDistMeters / 500);
+            idealZoom = 15.2 - Math.log2(maxDistMeters / 500);
         }
 
-        const finalZoom = Math.min(Math.max(idealZoom, 11), 16);
-        console.log(`[C2 UX] Auto-zooming to ${finalZoom.toFixed(1)} based on max distance ${Math.round(maxDistMeters)}m`);
+        const finalZoom = Math.min(Math.max(idealZoom, 11), 16.5);
+        console.log(`[C2 UX] Robust flying to zoom ${finalZoom.toFixed(1)} (max dist: ${Math.round(maxDistMeters)}m)`);
 
-        setViewState(prev => ({
-            ...prev,
-            latitude: userLocation.lat,
-            longitude: userLocation.long,
+        // Use flyTo for robust, direct control
+        mapRef.current.flyTo({
+            center: [userLocation.long, userLocation.lat],
             zoom: finalZoom,
-            transitionDuration: 1000
-        }));
+            duration: 1500,
+            essential: true
+        });
 
         setLastZoomedStoresId(currentStoresId);
 
-    }, [stores, !!userLocation]);
+    }, [stores, !!userLocation, !!mapRef.current]);
 
     const handleLock = async () => {
         if (!selectedStore) return;
@@ -263,6 +264,7 @@ export default function MapWrapper({ intentData, onLoadingChange }: MapWrapperPr
         <div className="w-full h-full relative">
             <Map
                 {...viewState}
+                ref={mapRef}
                 onMove={(evt) => setViewState(evt.viewState)}
                 style={{ width: "100%", height: "100%" }}
                 mapStyle="mapbox://styles/mapbox/dark-v11"
