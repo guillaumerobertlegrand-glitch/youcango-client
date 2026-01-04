@@ -1,0 +1,118 @@
+,,,,,,,,,,,,,,,,,
+,YouCanGo - MVP - Triggers,,,,,,,,,,,,,,,,
+,3 janvier 2026,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+,,Type de marché,Professionnels,,,,,Triggers,,,,,,,,,
+,,,,,,#1 - Parcours du client,,#2 - Arrivée du client,,#3 - Prestation en cours,,#4 - Fin de prestation,,#5 - Paiement,,#6 - Départ du client / Fin,
+,,,Famille,Catégorie,Activité,Pro,Client,Pro,Client,Pro,Client,Pro,Client,Pro,Client,Pro,Client
+,,,,,,,,,,,,,,,,,
+,,C to B,Service,Loisirs,Restaurant traditionnel,"1 - Disponibilité générale déclarée
+2 - Géolocalisation dans l'établissement
+3 - App YCG active
+4 - Non annulation de la demande de prestation","1 - Demande dans l'App YCG
+2 - Choix d'un prestataire dans l'App YCG
+3 - Non annulation de la demande
+4 - Parcours vers le Pro choisi dans l'App YCG","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Pro
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale (50m) à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie des mouvements locaux importants
+4 - App YCG active","1 - Géolocalisation fixe ET égale à l'établissement
+2 - Autres activités Smartphone possibles
+3 - App YCG ouverte mais pas en Front","1 - Géolocalisation égale (50m) à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie des mouvements locaux importants
+4 - App YCG active","1 - Reprise des mouvements locaux du smatphone (Déplacements dans l'établissement)
+2 - Contrôle de la durée prévisionnelle du repas (Fenêtre de durée)",1 - Utilisation de l'App YCG pour procéder au paiement,1 - Utilisation de l'App YCG pour procéder au paiement,,1 - Géolocalisation différente (>100m) de l'établissement
+,,C to B,Service,Automobile,Entretien automobile,"1 - Disponibilité générale déclarée
+2 - Géolocalisation dans l'établissement
+3 - App YCG active
+4 - Non annulation de la demande de prestation","1 - Demande dans l'App YCG
+2 - Choix d'un prestataire dans l'App YCG
+3 - Non annulation de la demande
+4 - Parcours vers le Pro choisi dans l'App YCG
+5 - Vitesse et comprtement de déplacement en voiture","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du pro
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle de l'établissement
+2 - Le Smartphone renvoie des mouvements locaux importants
+3 - App YCG active","1 - Géolocalisation peut être différente de celle de l'établissement
+2 - Autres activités Smartphone possibles
+3 - Cas particulier : App YCG ouverte peut lancer une autre requête (Passer le temps pendant l'entretien automobile) (Gestion d'une double requête)",1 - Reprise de mouvements locaux du smartphone (Déplacements à l'intérieur de l'établissement),"1 - Géolocalisation égale à celle de l'établissement
+2 - Mouvements locaux du smartphone (Déplacements à l'intérieur de l'établissement)
+3 - Contrôle de la durée prévisionnelle de la prestation (Fenêtre de durée)",1 - Utilisation de l'App YCG pour procéder au paiement,1 - Utilisation de l'App YCG pour procéder au paiement,,1 - Géolocalisation différente (>100m) de l'établissement
+,,C to B,Service,Soins,Coiffeur,"1 - Disponibilité générale déclarée
+2 - Géolocalisation dans l'établissement
+3 - App YCG active
+4 - Non annulation de la demande de prestation","1 - Demande dans l'App YCG
+2 - Choix d'un prestataire dans l'App YCG
+3 - Non annulation de la demande
+4 - Parcours vers le Pro choisi dans l'App YCG","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Pro
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie peu des mouvements locaux (Mains prises par la prestation)
+4 - App YCG active","1 - Géolocalisation fixe ET égale à l'établissement
+2 - Smartphone majoritairement immobile
+3 - Autres activités Smartphone possibles mais pas pendant toute la durée de la prestation
+3 - App YCG ouverte mais pas en Front","1 - Géolocalisation égale (50m) à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie la reprise de mouvements locaux importants
+4 - App YCG active","1 - Reprise des mouvements locaux du smatphone (Déplacements dans l'établissement)
+2 - Contrôle de la durée prévisionnelle de la prestation(Fenêtre de durée)
+3 - Reprise de l'activité sur le Smartphone",1 - Utilisation de l'App YCG pour procéder au paiement,1 - Utilisation de l'App YCG pour procéder au paiement,,1 - Géolocalisation différente (>100m) de l'établissement
+,,C to B,Service,Soins,Salon de beauté,"1 - Disponibilité générale déclarée
+2 - Géolocalisation dans l'établissement
+3 - App YCG active
+4 - Non annulation de la demande de prestation","1 - Demande dans l'App YCG
+2 - Choix d'un prestataire dans l'App YCG
+3 - Non annulation de la demande
+4 - Parcours vers le Pro choisi dans l'App YCG","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du pro
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie peu des mouvements locaux (Mains prises par la prestation)
+4 - App YCG active","1 - Géolocalisation fixe ET égale à l'établissement
+2 - Smartphone immobile
+3 - Pas d'activité sur le Smartphone
+4 - App YCG ouverte mais idle","1 - Géolocalisation égale (50m) à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie la reprise de mouvements locaux importants
+4 - App YCG active","1 - Reprise des mouvements locaux du smatphone (Déplacements dans l'établissement)
+2 - Contrôle de la durée prévisionnelle de la prestation(Fenêtre de durée)
+3 - Reprise de l'activité sur le Smartphone",1 - Utilisation de l'App YCG pour procéder au paiement,1 - Utilisation de l'App YCG pour procéder au paiement,,1 - Géolocalisation différente (>100m) de l'établissement
+,,C to B,Service,Soins,Massage / Spa / Bien-être,"1 - Disponibilité générale déclarée
+2 - Géolocalisation dans l'établissement
+3 - App YCG active
+4 - Non annulation de la demande de prestation","1 - Demande dans l'App YCG
+2 - Choix d'un prestataire dans l'App YCG
+3 - Non annulation de la demande
+4 - Parcours vers le Pro choisi dans l'App YCG","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Pro
+2 - Géolocalisation égale à celle de l'établissement
+3 - App YCG active","1 - Géolocalisation égale à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie peu des mouvements locaux (Mains prises par la prestation)
+4 - App YCG active","1 - Géolocalisation fixe ET égale à l'établissement
+2 - Smartphone immobile
+3 - Pas d'activité sur le Smartphone
+4 - App YCG ouverte mais idle","1 - Géolocalisation égale (50m) à celle du Client
+2 - Géolocalisation égale à celle de l'établissement
+3 - Le Smartphone renvoie la reprise de mouvements locaux importants
+4 - App YCG active","1 - Reprise des mouvements locaux du smatphone (Déplacements dans l'établissement)
+2 - Contrôle de la durée prévisionnelle de la prestation(Fenêtre de durée)
+3 - Reprise de l'activité sur le Smartphone",1 - Utilisation de l'App YCG pour procéder au paiement,1 - Utilisation de l'App YCG pour procéder au paiement,,1 - Géolocalisation différente (>100m) de l'établissement
+,,,,,,,,,,,,,,,,,
+,,C to B,Marchand,Commerces,Tous commerces,-,"1 - Notification de proximité et de pertinence adressée par YCG
+2 - Tracking du parcours pour vérifier si le client suis la recommandation
+3 - App YCG active",-,"1 - Géolocalisation égale à celle de l'établissement
+2 - App YCG active",-,"1 - Géolocalisation égale à celle de l'établissement
+2 - Mouvements locaux compatibles avec un déplacement dans le commerce",-,1 - Durée de présence sur site compatible avec un achat,-,-,-,1 - Géolocalisation différente (>100m) de l'établissement
