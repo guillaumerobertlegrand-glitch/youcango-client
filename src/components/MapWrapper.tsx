@@ -19,6 +19,7 @@ interface Store {
     lat: number;
     long: number;
     dist_meters: number;
+    location_id: string; // Needed for Session creation
 }
 
 interface MapWrapperProps {
@@ -107,6 +108,13 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
     // 1. Stable Geolocation
     useEffect(() => {
+        // [DEMO MODE] Force Paris location to see Seed Data (Dandy Barber)
+        // Ignoring real GPS for now because user might be far away
+        console.log("[MapWrapper] Forcing Mock Location (Paris) for Demo");
+        setUserLocation(PARIS_FALLBACK);
+
+        /* 
+        // Real Geolocation Logic (Restorable later)
         if (!navigator.geolocation) {
             setUserLocation(PARIS_FALLBACK);
             return;
@@ -128,17 +136,14 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             setUserLocation(prev => prev || PARIS_FALLBACK);
         };
 
-        // Get initial position
         navigator.geolocation.getCurrentPosition(handleSuccess, handleError, { timeout: 5000 });
-
-        // Watch for movements (low accuracy for battery/stability)
         const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
             enableHighAccuracy: false,
             timeout: 15000,
             maximumAge: 60000
         });
-
         return () => navigator.geolocation.clearWatch(watchId);
+        */
     }, []);
 
     // 2. Stabilized Fetch Effect
@@ -171,13 +176,14 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             activeRequestsRef.current += 1;
             onLoadingChange?.(true);
 
+            console.log("[MapWrapper] Fetching merchants...", { lat, long, category: intentData.category, keywords: intentData.keywords });
+
             try {
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
                     p_category: intentData.category,
-                    p_keywords: intentData.keywords || [],
-                    p_specific_category: (intentData as any).extracted_category || null
+                    p_keywords: intentData.keywords || []
                 });
 
                 const timeoutPromise = new Promise((_, reject) =>
@@ -186,11 +192,14 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
                 const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as any;
 
+                console.log("[MapWrapper] RPC Response:", { data, error });
+
                 if (!isEffectAlive || !isComponentMounted.current) return;
 
                 if (error) {
                     console.error(`[C2 Search][${requestId}] RPC Error:`, error.message);
                 } else if (data) {
+                    console.log("[MapWrapper] Setting stores:", data.length);
                     setStores(data as Store[]);
                     lastExecutionRef.current = currentParams;
                 }
@@ -248,10 +257,24 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             onStoreSelected?.(selectedStore);
         }
 
+        // Fetch a free slot for this org (Demo Logic)
+        let slotId = null;
+        const { data: slots } = await supabase
+            .from('slots')
+            .select('id')
+            .eq('organization_id', targetStore.id)
+            .eq('status', 'free')
+            .limit(1);
+
+        if (slots && slots.length > 0) {
+            slotId = slots[0].id;
+        }
+
         const { data, error } = await supabase.rpc('api_v1_create_session', {
-            p_location_id: targetStore.id,
+            p_location_id: targetStore.location_id, // Corrected: Use Location ID, not Org ID
             p_monetization_model: targetStore.business_type === 'service' ? 'commission' : 'subscription',
-            p_arrival_timing_minutes: arrivalTiming
+            p_arrival_timing_minutes: arrivalTiming,
+            p_slot_id: slotId
         });
 
         if (data?.session_id) {

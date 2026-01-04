@@ -9,10 +9,13 @@ DECLARE
     v_service_beard UUID;
     v_service_shave UUID;
 BEGIN
-    -- 1. Create Organization
-    INSERT INTO public.organizations (name, business_type, category, address, status, wifi_ssid, coordinates)
-    VALUES ('The Dandy Barber', 'service', 'barber', '12 Rue de la Paix, Paris', 'active', 'DandyGuest_Free', ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)::geography)
+    -- 1. Create Organization & Location
+    INSERT INTO public.organizations (name, business_type, category, status, wifi_ssid)
+    VALUES ('The Dandy Barber', 'service', 'barber', 'active', 'DandyGuest_Free')
     RETURNING id INTO v_org_id;
+
+    INSERT INTO public.locations (organization_id, name, address, coordinates)
+    VALUES (v_org_id, 'Main Shop', '12 Rue de la Paix, Paris', ST_SetSRID(ST_MakePoint(2.3522, 48.8566), 4326)::geography);
 
     -- 2. Create Professionals
     INSERT INTO public.professionals (organization_id, first_name, last_name, role, status)

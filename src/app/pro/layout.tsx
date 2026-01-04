@@ -10,6 +10,8 @@ export const metadata: Metadata = {
     description: "Professional Interface",
 };
 
+import ProSessionListener from "@/components/ProSessionListener";
+
 export default function ProLayout({
     children,
 }: Readonly<{
@@ -17,6 +19,7 @@ export default function ProLayout({
 }>) {
     return (
         <div className={`min-h-screen bg-slate-50 flex flex-col font-sans ${inter.className}`}>
+            <ProSessionListener />
             {/* Pro Header */}
             <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-50">
                 <div className="flex flex-col">
