@@ -78,14 +78,25 @@ ALTER TABLE public.professional_service_authorizations ENABLE ROW LEVEL SECURITY
 ALTER TABLE public.slots ENABLE ROW LEVEL SECURITY;
 
 -- 1. Public Read Access for Active Offers (Simplified for MVP)
+-- 1. Public Read Access for Active Offers (Simplified for MVP)
+DROP POLICY IF EXISTS "Public can view active services" ON public.services;
 CREATE POLICY "Public can view active services" ON public.services FOR SELECT USING (active = true);
+
+DROP POLICY IF EXISTS "Public can view active professionals" ON public.professionals;
 CREATE POLICY "Public can view active professionals" ON public.professionals FOR SELECT USING (status = 'active');
+
+DROP POLICY IF EXISTS "Public can view free slots" ON public.slots;
 CREATE POLICY "Public can view free slots" ON public.slots FOR SELECT USING (status = 'free');
 
 -- 2. Managers have full control over their Organization's data
--- (Assuming we have a way to link auth.uid() -> professional.id -> role='manager')
--- For MVP/Demo: Allow authenticated users to act as managers for now, or refine later.
+DROP POLICY IF EXISTS "Authenticated users can manage services" ON public.services;
 CREATE POLICY "Authenticated users can manage services" ON public.services FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Authenticated users can manage pros" ON public.professionals;
 CREATE POLICY "Authenticated users can manage pros" ON public.professionals FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Authenticated users can manage authorizations" ON public.professional_service_authorizations;
 CREATE POLICY "Authenticated users can manage authorizations" ON public.professional_service_authorizations FOR ALL USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Authenticated users can manage slots" ON public.slots;
 CREATE POLICY "Authenticated users can manage slots" ON public.slots FOR ALL USING (auth.role() = 'authenticated');

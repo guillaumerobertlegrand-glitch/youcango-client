@@ -2,6 +2,9 @@
 
 import Map, { Marker, Popup, NavigationControl, GeolocateControl, Source, Layer } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { useRouter } from 'next/navigation';
+import { getOrCreateAnonymousId } from "@/utils/auth-helpers";
+import mapboxgl from 'mapbox-gl';
 import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from "react";
 import { Zap, MapPin, Store as StoreIcon, Clock, Navigation } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +38,7 @@ interface MapWrapperProps {
     onLockProgress?: (progress: number) => void;
     onStoreSelected?: (store: Store | null) => void;
     onRouteInfoUpdate?: (info: { distance: number; duration: number } | null) => void;
+    onOverlayStateChange?: (isVisible: boolean) => void;
     unifiedMode?: boolean;
 }
 
@@ -48,6 +52,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
     onLockProgress,
     onStoreSelected,
     onRouteInfoUpdate,
+    onOverlayStateChange,
     unifiedMode
 }, ref) => {
     const supabase = createClient();
@@ -69,6 +74,12 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
     const [arrivalTiming, setArrivalTiming] = useState(15);
     const [routeData, setRouteData] = useState<any>(null);
     const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
+    const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
+
+    // Payment State (C6)
+    const [showPaymentOverlay, setShowPaymentOverlay] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
+    const [paymentTimer, setPaymentTimer] = useState(5);
 
     // Timer logic for locking (C3)
     useEffect(() => {
@@ -93,6 +104,40 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
     // Safety refs to track search state and avoid infinite loops
     const lastExecutionRef = useRef<string>("");
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (showPaymentOverlay && paymentTimer > 0) {
+            interval = setInterval(() => {
+                setPaymentTimer(prev => prev - 1);
+            }, 1000);
+        } else if (showPaymentOverlay && paymentTimer === 0) {
+            // Auto Finalize
+            if (activeSession) {
+                console.log("Auto-Finalizing Payment...");
+                supabase.rpc('api_v1_finalize_payment', { p_session_id: activeSession.id }).then(({ error }) => {
+                    if (error) console.error("Finalize Error:", error);
+                });
+            }
+        }
+        return () => clearInterval(interval);
+    }, [showPaymentOverlay, paymentTimer, activeSession]);
+    // Unified "Clean Mode" check
+    // If true, we hide everything (Markers, Controls, Parent UI)
+    const isCleanMode = showCompletionOverlay || showPaymentOverlay || activeSession?.state === 'in_progress';
+
+    // Sync Overlay State with Parent (Debounced to handle transitions)
+    useEffect(() => {
+        if (isCleanMode) {
+            onOverlayStateChange?.(true);
+        } else {
+            // Delay sending 'false' to allow for immediate transitions
+            const t = setTimeout(() => {
+                onOverlayStateChange?.(false);
+            }, 100);
+            return () => clearTimeout(t);
+        }
+    }, [isCleanMode, onOverlayStateChange]);
 
     useImperativeHandle(ref, () => ({
         cancelLock: () => handleCancelLock(),
@@ -119,7 +164,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             setUserLocation(PARIS_FALLBACK);
             return;
         }
-
+    
         const handleSuccess = (pos: GeolocationPosition) => {
             if (!isComponentMounted.current) return;
             const { latitude, longitude } = pos.coords;
@@ -129,13 +174,13 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             });
             setViewState(prev => (prev.latitude === PARIS_FALLBACK.lat ? { ...prev, latitude, longitude } : prev));
         };
-
+    
         const handleError = (err: GeolocationPositionError) => {
             if (!isComponentMounted.current) return;
             console.warn("[Geolocation Logic] Error:", err.message);
             setUserLocation(prev => prev || PARIS_FALLBACK);
         };
-
+    
         navigator.geolocation.getCurrentPosition(handleSuccess, handleError, { timeout: 5000 });
         const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
             enableHighAccuracy: false,
@@ -179,11 +224,14 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             console.log("[MapWrapper] Fetching merchants...", { lat, long, category: intentData.category, keywords: intentData.keywords });
 
             try {
+                const viewerId = getOrCreateAnonymousId();
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
                     p_category: intentData.category,
-                    p_keywords: intentData.keywords || []
+                    p_keywords: intentData.keywords || [],
+                    p_radius_meters: 5000,
+                    p_viewer_id: viewerId // Pass identity for Cooldown filtering
                 });
 
                 const timeoutPromise = new Promise((_, reject) =>
@@ -200,7 +248,9 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     console.error(`[C2 Search][${requestId}] RPC Error:`, error.message);
                 } else if (data) {
                     console.log("[MapWrapper] Setting stores:", data.length);
-                    setStores(data as Store[]);
+                    // Filter out excluded merchants (Temporary Decline)
+                    const visibleStores = (data as Store[]).filter(s => !excludedMerchantIds.includes(s.id));
+                    setStores(visibleStores);
                     lastExecutionRef.current = currentParams;
                 }
             } catch (e: any) {
@@ -243,6 +293,104 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
         setLastZoomedStoresId(currentStoresId);
     }, [stores, !!userLocation, !!mapRef.current]);
+
+    const [excludedMerchantIds, setExcludedMerchantIds] = useState<string[]>([]);
+
+    // Session Listener (Cancel/Decline Logic)
+    useEffect(() => {
+        const sessionId = activeSession?.id;
+        if (!sessionId) return;
+
+        console.log("[MapWrapper] Listening for updates on session:", sessionId);
+        const channel = supabase
+            .channel(`session-${sessionId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'sessions',
+                    filter: `id=eq.${sessionId}`
+                },
+                (payload) => {
+                    console.log("[MapWrapper] Session Update:", payload);
+                    if (payload.new.state === 'cancelled') {
+                        // alert("The Professional has declined the request. They will be temporarily hidden.");
+
+                        // 1. Exclude the merchant
+                        if (selectedStore) {
+                            const blockedId = selectedStore.id;
+                            setExcludedMerchantIds(prev => [...prev, blockedId]);
+                            // Force immediate update of displayed stores
+                            setStores(prevStores => prevStores.filter(s => s.id !== blockedId));
+                        }
+
+                        // 2. Reset State
+                        setActiveSession(null);
+                        activeSessionRef.current = null;
+                        setIsLocking(false);
+                        onLockingChange?.(false);
+                        setSelectedStore(null);
+                        onStoreSelected?.(null);
+                        setRouteInfo(null);
+                        onRouteInfoUpdate?.(null);
+                    }
+                    else if (payload.new.state === 'in_progress') {
+                        console.log("[MapWrapper] Service Started (The Gap) - Resetting UI");
+                        // RESET UI LOGIC:
+                        // Keep activeSession BUT clear the map, route, and store card.
+                        setIsRevealed(false);
+                        setSelectedStore(null);
+                        onStoreSelected?.(null);
+                        setRouteData(null);
+                        setRouteInfo(null);
+                        onRouteInfoUpdate?.(null);
+                        onGuidanceStateChange?.(false);
+
+                        // Update local session state to reflect change
+                        setActiveSession((prev: any) => ({ ...prev, state: 'in_progress' }));
+                        activeSessionRef.current = { ...activeSessionRef.current, state: 'in_progress' };
+                    }
+                    else if (payload.new.state === 'completed' && payload.old.state !== 'completed') {
+                        console.log("[MapWrapper] Session Completed (Transition)!");
+                        setShowCompletionOverlay(true);
+
+                        // Auto Dismiss C5 Overlay after 5s
+                        // NOTE: We do NOT clear activeSession here. It stays active until Payment Finalization.
+                        setTimeout(() => {
+                            setShowCompletionOverlay(false);
+                        }, 5000);
+                    }
+
+                    // Payment Status Updates
+                    if (payload.new.payment_status === 'proposed') {
+                        setPaymentAmount(payload.new.amount);
+                        // Only force close C5 if it's been a while? No, payment implies completion is done.
+                        // But if we want to show 'Completed' first, we might have a race condition.
+                        // For now, let's prioritize Payment if it arrives.
+                        setShowCompletionOverlay(false);
+                        setShowPaymentOverlay(true);
+                        setPaymentTimer(5);
+                    }
+                    else if (payload.new.payment_status === 'paid' || payload.new.payment_status === 'failed') {
+                        setShowPaymentOverlay(false);
+                        setActiveSession(null);
+                        activeSessionRef.current = null;
+                        setIsLocking(false);
+                        onLockingChange?.(false);
+                        setSelectedStore(null);
+                        onStoreSelected?.(null);
+                        setRouteInfo(null);
+                        onRouteInfoUpdate?.(null);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [activeSession?.id]); // Only change if ID changes
 
     const handleLock = async (storeToLock?: Store) => {
         const targetStore = storeToLock || selectedStore;
@@ -340,17 +488,23 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
     };
 
     const handleArrival = async () => {
+        // C4 -> P5: Start Service (The Gap)
         const session = activeSessionRef.current || activeSession;
-        if (session) await supabase.from('sessions').update({ state: 'completed' }).eq('id', session.id);
-        setIsRevealed(false);
-        setActiveSession(null);
-        activeSessionRef.current = null;
-        setSelectedStore(null);
-        setRouteData(null);
-        setRouteInfo(null);
-        onRouteInfoUpdate?.(null);
-        onStoreSelected?.(null);
-        onGuidanceStateChange?.(false);
+        if (session) {
+            console.log("Triggering Arrival -> In Progress");
+            await supabase.rpc('api_v1_start_service', { p_session_id: session.id });
+
+            // Note: We don't manually reset UI here anymore, we let the Realtime Listener do it 
+            // for consistency (in case Pro triggered it). 
+            // BUT to feel instant for the user clicking the button, we can optimistic update:
+            setIsRevealed(false);
+            setSelectedStore(null);
+            onStoreSelected?.(null);
+            setRouteData(null);
+            setRouteInfo(null);
+            onRouteInfoUpdate?.(null);
+            onGuidanceStateChange?.(false);
+        }
     };
 
     return (
@@ -363,10 +517,50 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 mapStyle="mapbox://styles/mapbox/dark-v11"
                 mapboxAccessToken={MAPBOX_TOKEN}
             >
-                <GeolocateControl position="top-left" />
-                <NavigationControl position="top-left" />
+                {/* Hide Controls during Payment/Completion/InProgress */}
+                {!isCleanMode && (
+                    <>
+                        <GeolocateControl position="top-left" />
+                        <NavigationControl position="top-left" />
+                    </>
+                )}
 
-                {userLocation && (
+                {/* Payment Overlay C6 */}
+                {showPaymentOverlay && paymentAmount && (
+                    <div className="absolute inset-x-4 top-32 z-[60] animate-in fade-in slide-in-from-top-4">
+                        <div className="bg-white/90 backdrop-blur-md border border-slate-200 shadow-2xl rounded-3xl p-6 flex flex-col items-center relative overflow-hidden">
+
+                            {/* Timer Progress Bar (Fill) */}
+                            <div
+                                className="absolute bottom-0 left-0 h-1 bg-green-500 transition-all duration-1000 ease-linear"
+                                style={{ width: `${(paymentTimer / 5) * 100}%` }}
+                            />
+
+                            <span className="text-sm font-bold text-green-600 uppercase tracking-widest mb-2">New reward added</span>
+                            <div className="text-5xl font-black text-slate-800 mb-4 tracking-tighter">
+                                {paymentAmount.toFixed(2)} €
+                            </div>
+
+                            <div className="flex justify-between w-full items-center">
+                                <p className="text-xs text-slate-400">Pill unfills in {paymentTimer}s...</p>
+                                <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    className="rounded-full h-12 w-12 shadow-lg"
+                                    onClick={async () => {
+                                        if (!activeSession) return;
+                                        await supabase.rpc('api_v1_reject_payment', { p_session_id: activeSession.id });
+                                        setShowPaymentOverlay(false);
+                                    }}
+                                >
+                                    <span className="font-bold text-xl">X</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {!isCleanMode && userLocation && (
                     <Marker longitude={userLocation.long} latitude={userLocation.lat} anchor="bottom">
                         <div className="relative flex items-center justify-center h-16 w-16 group">
                             <div className="absolute animate-ping inline-flex h-full w-full rounded-full bg-blue-400 opacity-20"></div>
@@ -375,9 +569,10 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     </Marker>
                 )}
 
-                {stores.slice(0, 4).filter(s => !isRevealed || s.id === selectedStore?.id).map((store, index) => (
+                {/* Hide Stores during Payment/Completion */}
+                {!isCleanMode && stores.slice(0, 4).filter(s => (!selectedStore) || s.id === selectedStore.id).map((store, index) => (
                     <Marker key={store.id} latitude={store.lat} longitude={store.long} anchor="bottom" onClick={(e) => { e.originalEvent.stopPropagation(); if (!isLocking && !isRevealed) handleLock(store); }}>
-                        {isRevealed ? (
+                        {isRevealed || isLocking ? (
                             <div className="flex flex-col items-center group cursor-pointer transition-transform hover:scale-110">
                                 <div className="bg-red-600 p-2 rounded-full shadow-2xl border-2 border-white animate-bounce-subtle">
                                     <MapPin size={24} fill="white" className="text-white" />
@@ -396,12 +591,132 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     </Marker>
                 ))}
 
-                {routeData && (
+                {routeData && !isCleanMode && (
                     <Source id="route" type="geojson" data={routeData}>
                         <Layer id="route-line" type="line" layout={{ 'line-join': 'round', 'line-cap': 'round' }} paint={{ 'line-color': '#3b82f6', 'line-width': 6, 'line-opacity': 0.8 }} />
                     </Source>
                 )}
             </Map>
+
+            {/* Pro Container (Detail Card) - Integrated into Map for clean View State management */}
+            {/* HIDDEN during Locking Phase (C3) - Only shows when Revealed (C4) */}
+            {!isCleanMode && activeSession && selectedStore && !isLocking && (
+                <div className="absolute inset-x-4 bottom-8 z-40 animate-in slide-in-from-bottom duration-500">
+                    <Card className="w-full bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-xl">
+                        <CardContent className="p-6">
+                            <div className="flex flex-col gap-6">
+                                <div className="flex items-start justify-between">
+                                    <h4 className="text-xl font-black text-slate-900 leading-tight tracking-tight max-w-[70%]">
+                                        {selectedStore.name.split(' ')[0]} expects you — <span className="text-blue-600">{routeInfo ? `${Math.ceil(routeInfo.duration / 60)} min` : '5 min'}</span>
+                                        <div className="text-sm font-bold text-slate-400 mt-1">{routeInfo ? (routeInfo.distance > 1000 ? `${(routeInfo.distance / 1000).toFixed(1)} km` : `${Math.round(routeInfo.distance)} m`) : '850m'} left</div>
+                                    </h4>
+                                    <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-slate-50 bg-slate-100 flex-shrink-0 shadow-sm">
+                                        <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200&h=200" alt="Merchant" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${selectedStore.name}&background=6366f1&color=fff&bold=true`; }} />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-black text-slate-900 truncate tracking-tight">{selectedStore.name}</h3>
+                                        <p className="text-sm text-slate-500 font-bold truncate opacity-80">{selectedStore.address}</p>
+                                    </div>
+                                    <Button
+                                        onClick={(e) => { e.stopPropagation(); handleArrival(); }}
+                                        className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-200 flex items-center justify-center p-0 transition-all hover:scale-105 active:scale-95"
+                                    >
+                                        <Zap size={24} fill="white" className="text-white" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Solid Background for Clean Mode (C5/C6) - Covers the Map */}
+            {isCleanMode && (
+                <div className="absolute inset-0 bg-slate-50 z-10 animate-in fade-in duration-700" />
+            )}
+
+            {/* Service In Progress Overlay (C5 - The Gap) */}
+            {activeSession?.state === 'in_progress' && (
+                <div className="absolute inset-x-0 bottom-0 top-0 z-50 flex flex-col items-center justify-center animate-in fade-in duration-700">
+                    {/* Text centered in the whitespace */}
+                    <div className="bg-white/80 backdrop-blur-md px-8 py-4 rounded-full shadow-lg border border-slate-100 flex items-center gap-4">
+                        <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                        <div className="flex flex-col">
+                            <span className="text-lg font-bold text-slate-800 tracking-tight">Haircut in progress</span>
+                            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">By Victor</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Overlay C6 */}
+            {showPaymentOverlay && paymentAmount && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-6 animate-in fade-in slide-in-from-bottom-8">
+                    <div className="w-full max-w-sm bg-white border border-slate-200 shadow-2xl rounded-[32px] p-8 flex flex-col items-center relative overflow-hidden">
+
+                        {/* Timer Progress Bar (Fill) */}
+                        <div
+                            className="absolute bottom-0 left-0 h-2 bg-green-500 transition-all duration-1000 ease-linear"
+                            style={{ width: `${(paymentTimer / 5) * 100}%` }}
+                        />
+
+                        <span className="text-sm font-bold text-green-600 uppercase tracking-widest mb-4">Payment Request</span>
+                        <div className="text-6xl font-black text-slate-900 mb-2 tracking-tighter">
+                            {paymentAmount.toFixed(2)}€
+                        </div>
+                        <p className="text-slate-400 text-sm font-medium mb-8">For your hair service</p>
+
+                        <div className="flex flex-col w-full gap-3">
+                            <Button
+                                className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg"
+                                onClick={() => {
+                                    // Auto-accept handled by timer, but visuals matter
+                                }}
+                            >
+                                Processing... {paymentTimer}s
+                            </Button>
+
+                            <Button
+                                variant="ghost"
+                                className="w-full h-12 text-slate-400 font-bold hover:text-red-500 hover:bg-red-50 rounded-xl"
+                                onClick={async () => {
+                                    if (!activeSession) return;
+                                    await supabase.rpc('api_v1_reject_payment', { p_session_id: activeSession.id });
+                                    setShowPaymentOverlay(false);
+                                }}
+                            >
+                                Reject / Dispute
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Completion Overlay (C6 - formerly C5) */}
+            {showCompletionOverlay && (
+                <div className="absolute inset-x-0 bottom-0 top-0 bg-slate-50/90 z-50 flex flex-col items-center justify-center animate-in fade-in duration-500">
+                    <div className="w-full max-w-sm px-6">
+                        <div className="w-full bg-slate-200 py-6 text-center rounded-sm mb-2">
+                            <h2 className="text-3xl font-black text-slate-700 uppercase tracking-tight">
+                                Haircut completed
+                            </h2>
+                        </div>
+                        <div className="w-full text-right mb-12">
+                            <p className="text-slate-900 font-medium">Victor</p>
+                            <p className="text-slate-600">Today - {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-[32px] rounded-tl-none p-6 text-left shadow-sm relative overflow-hidden">
+                            <div className="absolute inset-0 bg-white/40 animate-[ping_1s_ease-out_1]" />
+                            <p className="text-xl font-medium text-slate-800 leading-tight relative z-10">
+                                This session will be settled via YouCanGo
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });

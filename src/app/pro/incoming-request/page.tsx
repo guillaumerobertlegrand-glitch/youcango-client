@@ -67,13 +67,28 @@ export default function IncomingRequestPage() {
             alert("Error accepting session: " + error.message);
         } else {
             console.log("Session Accepted:", data);
-            alert("Session Validated (Pending)! 🚀 Redirecting to Dashboard...");
-            router.push("/pro");
+            router.push(`/pro/active-session?session_id=${sessionId}`);
         }
     };
 
-    const handleDecline = () => {
-        router.push("/pro");
+    const handleDecline = async () => {
+        if (!sessionId) {
+            router.push("/pro");
+            return;
+        }
+
+        const { error } = await supabase.rpc('api_v1_cancel_session', {
+            p_session_id: sessionId
+        });
+
+        if (error) {
+            console.error("Decline Error:", error);
+            alert("Error declining: " + error.message);
+        } else {
+            // Success: Session cancelled. Client will be notified via Realtime.
+            // Pro goes back to Dashboard.
+            router.push("/pro");
+        }
     };
 
     return (
