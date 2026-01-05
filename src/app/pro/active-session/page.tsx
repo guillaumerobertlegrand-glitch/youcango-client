@@ -38,12 +38,16 @@ export default function ActiveSessionPage() {
         if (!sessionId) return;
         console.log("Triggering Completion...");
 
-        const { error } = await supabase.rpc('api_v1_complete_session', {
+        const { data, error } = await supabase.rpc('api_v1_complete_session', {
             p_session_id: sessionId
         });
 
         if (error) {
-            console.error("Completion Error:", error);
+            console.error("Completion Network/Server Error:", error);
+            alert("Error: " + error.message);
+        } else if (data && !data.success) {
+            console.error("Completion Logic Error:", data.error);
+            alert("Completion Failed: " + data.error);
         } else {
             router.push(`/pro/completion?session_id=${sessionId}`);
         }
@@ -82,11 +86,18 @@ export default function ActiveSessionPage() {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative overflow-hidden">
             {/* Header */}
-            <header className="px-6 py-6 flex items-center justify-between z-10">
-                <h1 className="text-2xl font-black tracking-tight">YouCanGo</h1>
-                <Button variant="ghost" size="icon" className="text-slate-900" onClick={handleSettings}>
-                    <Settings size={24} />
-                </Button>
+            <header className="px-6 py-6 flex flex-col z-10">
+                <div className="flex items-center justify-between w-full">
+                    <h1 className="text-2xl font-black tracking-tight">YouCanGo</h1>
+                    <Button variant="ghost" size="icon" className="text-slate-900" onClick={handleSettings}>
+                        <Settings size={24} />
+                    </Button>
+                </div>
+                {sessionId && (
+                    <div className="text-[10px] bg-slate-200 text-slate-500 px-2 py-1 rounded inline-block self-start mt-2 font-mono">
+                        ID: {sessionId.slice(0, 8)}...
+                    </div>
+                )}
             </header>
 
             <main className="flex-1 flex flex-col px-6 pt-12 pb-6 w-full max-w-md mx-auto items-center">
