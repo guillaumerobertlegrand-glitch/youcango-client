@@ -154,11 +154,17 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
             try {
                 const viewerId = getOrCreateAnonymousId();
+                // Combine keywords and category for broader search
+                const searchKeywords = [...(intentData.keywords || [])];
+                if (intentData.category && !searchKeywords.includes(intentData.category)) {
+                    searchKeywords.push(intentData.category);
+                }
+
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
                     p_category: intentData.category,
-                    p_keywords: intentData.keywords || [],
+                    p_keywords: searchKeywords,
                     p_radius_meters: 5000,
                     p_viewer_id: viewerId // Pass identity for Cooldown filtering
                 });
