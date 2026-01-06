@@ -119,7 +119,97 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-slate-100 text-foreground antialiased selection:bg-blue-100 selection:text-blue-900;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Native Mobile Simulation */
+  :root {
+    --safe-top: env(safe-area-inset-top, 47px);
+    --safe-bottom: env(safe-area-inset-bottom, 34px);
+  }
+
+  /* Desktop "Phone Frame" simulation */
+  @media (min-width: 768px) {
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-image: radial-gradient(circle at center, #e2e8f0 0%, #cbd5e1 100%);
+    }
+
+    /* Target the main container in layouts */
+    main {
+      width: 100%;
+      max-width: 430px;
+      /* iPhone 14/15 Pro Max width */
+      height: 90vh;
+      /* Not full screen on desktop */
+      max-height: 932px;
+      border-radius: 40px;
+      box-shadow:
+        0 0 0 12px #1e293b,
+        /* Bezel */
+        0 20px 50px -12px rgba(0, 0, 0, 0.5);
+      /* Drop shadow */
+      overflow: hidden;
+      position: relative;
+      background: white;
+    }
+
+    /* Simulate Dynamic Island / Notch area */
+    main::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 35px;
+      background: #1e293b;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+  }
+}
+
+/* Utilities for Native Feel */
+@layer utilities {
+  .safe-top {
+    padding-top: var(--safe-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* Mapbox Overrides */
+  .mapboxgl-ctrl-logo,
+  .mapboxgl-ctrl-attrib {
+    display: none !important;
+  }
+
+  /* Hide Scrollbar but keep functionality */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border-b border-white/20;
+  }
+
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl;
   }
 }

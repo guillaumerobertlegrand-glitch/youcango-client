@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import IntentCapture from "@/components/IntentCapture";
 import MapWrapper from "@/components/MapWrapper";
-import { Zap, Settings, Plus, Mic, AudioLines, Send } from "lucide-react";
+import { Zap, Settings, Plus, Mic, AudioLines, Send, ArrowRight, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/utils/supabase/client";
@@ -26,7 +26,9 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     const [isGuiding, setIsGuiding] = useState(false);
     const [isLocking, setIsLocking] = useState(false);
     const [lockProgress, setLockProgress] = useState(100);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<Message[]>([
+        { id: 'init', text: 'Bonjour ! Que puis-je faire pour vous ?', sender: 'system' }
+    ]);
     const [inputValue, setInputValue] = useState("");
     // Overlay State (C5/C6 Clean Mode)
     const [isOverlayVisible, setIsOverlayVisible] = useState(false);
@@ -34,11 +36,20 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     // C4 Polish: Selected store and route info data
     const [selectedStore, setSelectedStore] = useState<any>(null);
     const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
+    const [activeSession, setActiveSession] = useState<any>(null);
 
     const mapRef = useRef<any>(null);
     const supabase = createClient();
 
-    const handleIntentCaptured = (data: any) => {
+    const handleIntentCaptured = (data: any, userText?: string) => {
+        console.log("[ClientHome] handleIntentCaptured triggered. UserText:", userText, "Data:", data);
+        if (userText) {
+            setMessages([{
+                id: Date.now().toString(),
+                text: userText,
+                sender: 'user'
+            }]);
+        }
         setIntentData(data);
         setStep('C2');
     };
@@ -55,6 +66,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         setSelectedStore(null);
         setRouteInfo(null);
         setIsOverlayVisible(false); // Reset overlay
+        setActiveSession(null);
     };
 
     const handleSendMessage = async (e?: React.FormEvent) => {
@@ -77,48 +89,59 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         });
 
         if (data?.result) {
-            handleIntentCaptured(data.result);
+            handleIntentCaptured(data.result, userText);
             setIsLoading(false);
         } else {
             console.error("AI Error:", error);
-            handleIntentCaptured({ category: 'merchant', keywords: [userText], intent_summary: userText });
+            handleIntentCaptured({ category: 'merchant', keywords: [userText], intent_summary: userText }, userText);
             setIsLoading(false);
         }
     };
 
+    // Debugging C4 Visibility
+    useEffect(() => {
+        console.log("ClientHome State Dump:", {
+            selectedStore: !!selectedStore,
+            isLocking,
+            isOverlayVisible,
+            activeSession: !!activeSession,
+            isGuiding
+        });
+    }, [selectedStore, isLocking, isOverlayVisible, activeSession, isGuiding]);
+
     return (
         <main className="flex flex-col h-screen bg-white max-w-md mx-auto relative overflow-hidden font-sans">
+            {/* Native-like Status Bar / Header (Relative - No Overlay) */}
             {!isOverlayVisible && (
-                <header className="flex items-center justify-between px-6 py-4 bg-white z-50">
+                <header className="flex-shrink-0 z-50 px-6 pt-12 pb-4 glass flex items-center justify-between relative">
                     <h1
                         className="text-2xl font-black tracking-tighter text-slate-900 cursor-pointer"
                         onClick={handleBackToC1}
                     >
                         YouCanGo
                     </h1>
-                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-900 transition-colors">
-                        <Settings size={22} />
+                    <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
+                        <Settings size={28} className="stroke-[2.5px]" />
                     </Button>
                 </header>
             )}
 
-            <div className={`flex-1 overflow-y-auto px-4 ${isOverlayVisible ? 'pb-0' : 'pb-32'} space-y-4`}>
-                {step === 'C1' && (
-                    <div className="h-full flex flex-col justify-end min-h-[40vh]">
-                        {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
-                                <div className={`px-5 py-2.5 rounded-2xl max-w-[85%] text-sm font-bold shadow-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none'
-                                    }`}>
-                                    {msg.text}
-                                </div>
-                            </div>
-                        ))}
+            {/* Map Area - Full Screen - Interactive */}
+            <div className="flex-1 relative w-full h-full">
+                {step === 'C1' ? (
+                    <div className="h-full w-full">
+                        <IntentCapture
+                            messages={messages}
+                            inputValue={inputValue}
+                            onInputChange={setInputValue}
+                            onSubmit={handleSendMessage}
+                            isInterpreting={isLoading}
+                        />
                     </div>
-                )}
-
-                {step === 'C2' && (
-                    <div className="w-full flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-bottom duration-700">
-                        <div className={`w-full overflow-hidden rounded-[32px] border border-slate-100 shadow-2xl transition-all duration-500 bg-slate-50 relative ${isOverlayVisible ? 'h-[95vh] -mt-4' : 'h-[65vh]'}`}>
+                ) : (
+                    <div className="flex flex-col h-full w-full">
+                        {/* MapWrapper - Fixed Height (Upper Part) */}
+                        <div className="h-[55vh] flex-shrink-0 relative w-full border-b border-slate-200">
                             <MapWrapper
                                 ref={mapRef}
                                 intentData={intentData}
@@ -129,45 +152,35 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                 onStoreSelected={setSelectedStore}
                                 onRouteInfoUpdate={setRouteInfo}
                                 onOverlayStateChange={setIsOverlayVisible}
+                                onSessionUpdate={setActiveSession}
                                 unifiedMode={true}
                             />
-
-                            {isLocking && (
-                                <div className="absolute inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom duration-300">
-                                    <Button
-                                        onClick={() => mapRef.current?.cancelLock()}
-                                        variant="outline"
-                                        className="relative w-full rounded-none border-0 border-t border-slate-100 bg-white/95 backdrop-blur-md text-slate-800 font-bold text-sm h-14 hover:bg-slate-50 transition-all shadow-none overflow-hidden group"
-                                    >
-                                        <div
-                                            className="absolute inset-y-0 left-0 bg-blue-600/10 pointer-events-none"
-                                            style={{ width: `${lockProgress}%` }}
-                                        />
-                                        <div className="flex items-center justify-between w-full relative z-10 px-6">
-                                            <span className="text-slate-500 font-black uppercase tracking-tighter text-[10px]">Annuler l'engagement ?</span>
-                                            <span className="tabular-nums font-black text-blue-600 text-lg">
-                                                {Math.ceil((lockProgress / 100) * 10)}s
-                                            </span>
-                                        </div>
-                                    </Button>
-                                </div>
-                            )}
                         </div>
 
-                        {!isOverlayVisible && (
-                            <div className="space-y-3 px-2 mt-4">
+                        {/* Message Stream - Remaining Space (Bottom Part) */}
+                        {!isOverlayVisible && (!activeSession || isLocking) && (
+                            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] space-y-3 relative z-20">
                                 {messages.map((msg) => (
-                                    <div key={msg.id} className="flex justify-end">
-                                        <div className="px-5 py-2.5 rounded-2xl bg-blue-600 text-white text-sm font-bold rounded-br-none shadow-sm">
+                                    <div key={msg.id} className="flex justify-start"> {/* Align Left or Right for history? User pills usually right */}
+                                        <div className={`
+                                            px-4 py-2 rounded-2xl max-w-[90%] text-sm font-medium shadow-sm
+                                            ${msg.sender === 'user'
+                                                ? 'bg-blue-600 text-white rounded-br-none ml-auto'
+                                                : 'bg-slate-100 text-slate-800 rounded-bl-none'}
+                                        `}>
                                             {msg.text}
                                         </div>
                                     </div>
                                 ))}
 
                                 {!isLoading && !isGuiding && (
-                                    <div className="flex justify-start animate-in fade-in slide-in-from-left duration-500 delay-300">
-                                        <div className="px-5 py-2.5 rounded-2xl bg-slate-100 text-slate-800 text-sm font-bold rounded-bl-none shadow-sm capitalize">
-                                            {(intentData?.extracted_category || intentData?.category || 'Recherche').replace('_', ' ')} - available now
+                                    <div className="flex justify-start animate-in fade-in slide-in-from-left duration-500">
+                                        <div className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-800 text-sm font-medium rounded-bl-none shadow-sm capitalize flex items-center gap-2">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                            </span>
+                                            {(intentData?.extracted_category || intentData?.category || 'Searching...').replace('_', ' ')} - available now
                                         </div>
                                     </div>
                                 )}
@@ -177,48 +190,140 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                 )}
             </div>
 
-            {!isGuiding && !isLocking && !isOverlayVisible && (
-                <div className="absolute bottom-8 left-0 right-0 px-4 z-50">
-                    <form
-                        onSubmit={handleSendMessage}
-                        className="bg-white border border-slate-200 rounded-full flex items-center p-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.08)]"
-                    >
-                        <Button type="button" variant="ghost" size="icon" className="rounded-full text-slate-400 h-10 w-10">
-                            <Plus size={20} />
+            {/* Locking State - Bottom Cancel Bar */}
+            {
+                isLocking && (
+                    <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                        <Button
+                            onClick={() => mapRef.current?.cancelLock()}
+                            variant="ghost"
+                            className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
+                        >
+                            {/* Progress Background (Emptying) */}
+                            <div
+                                className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
+                                style={{ width: `${lockProgress}%` }}
+                            />
+
+                            {/* Content */}
+                            <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
+                                <span className="font-medium text-lg text-slate-900">Cancel?</span>
+                            </div>
                         </Button>
+                    </div>
+                )
+            }
 
-                        <input
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="What do you need?"
-                            className="flex-1 bg-transparent px-3 py-2 text-slate-800 focus:outline-none placeholder:text-slate-400 font-bold text-sm"
-                        />
+            {/* Native Input Bar */}
+            {
+                !isGuiding && !isLocking && !isOverlayVisible && !selectedStore && !activeSession && (
+                    <div className="absolute bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 glass">
+                        <form
+                            onSubmit={handleSendMessage}
+                            className="flex items-center gap-2"
+                        >
+                            <Button type="button" variant="ghost" size="icon" className="text-slate-400 hover:text-blue-600 transition-colors w-9 h-9">
+                                <Plus size={24} className="stroke-[2.5px]" />
+                            </Button>
 
-                        <div className="flex items-center gap-1">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    placeholder="What do you need?"
+                                    className="w-full bg-slate-100 border-none rounded-full px-4 py-2.5 text-[16px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 placeholder:text-slate-400 font-medium transition-all shadow-inner"
+                                />
+                                {!inputValue && (
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                                        <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-slate-400 hover:bg-white/50">
+                                            <Mic size={18} />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+
                             {inputValue ? (
-                                <Button type="submit" size="icon" className="rounded-full bg-blue-600 text-white h-10 w-10 hover:bg-blue-700">
-                                    <Send size={18} />
+                                <Button type="submit" size="icon" className="rounded-full bg-blue-600 text-white w-9 h-9 hover:bg-blue-700 shadow-md animate-in zoom-in-50 duration-200">
+                                    <Send size={16} className="ml-0.5" />
                                 </Button>
                             ) : (
-                                <>
-                                    <Button variant="ghost" size="icon" className="rounded-full text-slate-400 h-10 w-10">
-                                        <Mic size={20} />
-                                    </Button>
-                                    <div className="h-10 w-10 bg-slate-900 rounded-full flex items-center justify-center text-white cursor-pointer transition-transform hover:scale-105 active:scale-95">
-                                        <AudioLines size={20} />
-                                    </div>
-                                </>
+                                <div className="w-9 h-9 bg-slate-900 rounded-full flex items-center justify-center text-white cursor-pointer hover:scale-105 active:scale-95 transition-all shadow-md">
+                                    <AudioLines size={18} />
+                                </div>
                             )}
+                        </form>
+                    </div>
+                )
+            }
+
+            {/* C4 Detail Card - Bottom Container (Replacing Pills & Input) */}
+            {
+                selectedStore && !isLocking && !isOverlayVisible && activeSession && (
+                    <div className="absolute bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 animate-in slide-in-from-bottom duration-500">
+                        <div className="glass-card rounded-[32px] p-1 shadow-2xl">
+                            <div className="bg-white/50 rounded-[28px] p-5">
+                                {/* Pro Info Header */}
+                                <div className="flex items-start justify-between mb-5">
+                                    <div className="flex items-center gap-4">
+                                        {/* Avatar (Pro Photo) */}
+                                        <div className="h-14 w-14 rounded-full bg-slate-200 shadow-sm border-2 border-white relative overflow-hidden flex-shrink-0">
+                                            {/* Placeholder Avatar */}
+                                            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center text-slate-400 font-bold text-xl">
+                                                {isGuiding && selectedStore.name ? selectedStore.name[0] : 'P'}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-[17px] font-bold text-slate-900 leading-tight tracking-tight capitalize">
+                                                    {isGuiding ? selectedStore.name : (selectedStore.category || selectedStore.business_type).replace('_', ' ')}
+                                                </h3>
+                                            </div>
+
+                                            {isGuiding && (
+                                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                                    <span className="text-[13px] text-slate-500 font-medium leading-snug">
+                                                        {selectedStore.address || '12 Rue de Rivoli, 75001 Paris'}
+                                                    </span>
+                                                    <span className="text-[13px] text-blue-600 font-medium">
+                                                        01 42 33 44 55
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {!isGuiding && (
+                                                <span className="text-[13px] text-slate-400 font-medium">
+                                                    Address hidden until confirmed
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* ETA / Distance */}
+                                    <div className="text-right flex-shrink-0">
+                                        <div className="text-2xl font-black text-slate-900 tracking-tighter">12 <span className="text-sm font-bold text-slate-400">min</span></div>
+                                    </div>
+                                </div>
+
+                                <Button
+                                    onClick={() => mapRef.current?.handleArrival?.()}
+                                    className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[17px] font-bold shadow-lg shadow-slate-200/50 transition-all active:scale-95 flex items-center justify-between px-6 group"
+                                >
+                                    <span>I'm here</span>
+                                    <div className="bg-white/20 rounded-full p-1 group-hover:translate-x-1 transition-transform">
+                                        <Navigation size={18} className="fill-current" />
+                                    </div>
+                                </Button>
+                            </div>
                         </div>
-                    </form>
-                </div>
-            )}
+                    </div>
+                )
+            }
 
             <div className="absolute inset-0 -z-10 opacity-20 pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-50 rounded-full blur-[100px]" />
                 <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-slate-100 rounded-full blur-[100px]" />
             </div>
-        </main>
+        </main >
     );
 }

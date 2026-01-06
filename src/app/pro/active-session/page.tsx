@@ -100,72 +100,83 @@ export default function ActiveSessionPage() {
                 )}
             </header>
 
-            <main className="flex-1 flex flex-col px-6 pt-12 pb-6 w-full max-w-md mx-auto items-center">
+            <main className="flex-1 flex flex-col w-full h-full relative">
+                {/* Mesh Background */}
+                <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
+                    <div className="absolute top-0 left-0 w-full h-2/3 bg-gradient-to-b from-blue-50/80 to-transparent" />
+                    <div className="absolute top-1/4 right-0 w-64 h-64 bg-purple-50 rounded-full blur-[80px]" />
+                </div>
 
-                {/* Status Box - P3/P4/P5 */}
-                {isInProgress ? (
-                    <div className="w-full flex-1 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-700">
-                        <div className="w-full aspect-square bg-white rounded-[32px] flex flex-col items-center justify-center p-6 text-center shadow-xl border border-slate-100 relative overflow-hidden mb-8">
-                            {/* Pulse Effect */}
-                            <div className="absolute inset-0 bg-green-50 opacity-50 animate-pulse"></div>
-
-                            <h2 className="text-3xl font-black text-slate-800 leading-tight mb-4 relative z-10">
-                                Haircut in progress
-                            </h2>
-                            <div className="inline-block bg-green-100 text-green-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider relative z-10 mb-8">
-                                P5 State
+                <div className="flex-1 flex flex-col px-6 pt-8 pb-32 z-10">
+                    {/* Status Box - P3/P4/P5 */}
+                    {isInProgress ? (
+                        <div className="w-full flex-1 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            <div className="relative w-64 h-64 mb-10 flex items-center justify-center">
+                                <div className="absolute inset-0 bg-green-400/20 rounded-full animate-ping duration-[3s]"></div>
+                                <div className="w-56 h-56 bg-white rounded-full shadow-2xl flex flex-col items-center justify-center relative z-10 border border-green-100">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Service</span>
+                                    <span className="text-2xl font-black text-slate-900 tracking-tight">Active</span>
+                                    <div className="w-2 h-2 bg-green-500 rounded-full mt-3 animate-pulse"></div>
+                                </div>
                             </div>
-                            <p className="text-sm text-slate-400 max-w-[200px] relative z-10">
-                                Focus on the service. The app will handle the rest.
-                            </p>
-                        </div>
 
-                        <Button
-                            onClick={handleCompletion}
-                            size="lg"
-                            className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-16 text-lg font-bold shadow-2xl shadow-slate-300 transform transition-all active:scale-95"
-                        >
-                            Complete Session
-                        </Button>
-                    </div>
-                ) : (
-                    <div
-                        onClick={() => handleStartService()} // Dev Trigger for P5
-                        className={`cursor-pointer w-full aspect-square rounded-[32px] flex items-center justify-center p-6 text-center shadow-lg transition-all duration-1000 ${isApproaching
-                            ? "bg-slate-200"
-                            : "bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-[length:200%_200%] animate-pulse"
-                            }`}>
-                        <div>
-                            <h2 className="text-3xl font-black text-slate-800 leading-tight mb-4">
-                                {statusText}
-                            </h2>
-                            {/* Simulation Badge */}
-                            <div className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                                {isApproaching ? "P4 State" : "P3 State"}
+                            <div className="text-center mb-8">
+                                <h2 className="text-3xl font-black text-slate-800 leading-tight mb-2">
+                                    Haircut in progress
+                                </h2>
+                                <p className="text-slate-400 font-medium">Focus on the client.</p>
                             </div>
-                            <p className="text-xs text-slate-400 mt-2">(Click to Simulate Arrival)</p>
-                        </div>
-                    </div>
-                )}
 
-                {/* Details (Only visible in P3/P4) */}
-                {!isInProgress && (
-                    <div className="w-full mt-8 space-y-4 text-right">
-                        <div className="text-xl font-bold text-slate-900 border-b border-slate-200 pb-2">
-                            Haircut - 30 min
+                            <Button
+                                onClick={handleCompletion}
+                                size="lg"
+                                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-16 text-lg font-bold shadow-xl shadow-slate-200/50 transform transition-all active:scale-95"
+                            >
+                                Complete Session
+                            </Button>
                         </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col justify-between">
+                            <div className="mt-8">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[11px] font-bold uppercase tracking-wider mb-4 border border-blue-100/50">
+                                    {isApproaching ? "Arrival Imminent" : "On the way"}
+                                </div>
+                                <h2 className="text-4xl font-black text-slate-900 leading-[1.1] tracking-tight">
+                                    {statusText}
+                                </h2>
+                            </div>
 
-                        <div className="flex justify-end items-baseline gap-2">
-                            <span className="text-slate-500 font-medium">
-                                {isApproaching ? "Arrival in" : "Expected arrival -"}
-                            </span>
-                            <span className={`text-4xl font-black tracking-tighter ${isApproaching ? "text-red-500 animate-pulse" : "text-slate-900"}`}>
-                                {eta} min
-                            </span>
+                            <div
+                                onClick={() => handleStartService()} // Dev Trigger
+                                className="flex-1 flex flex-col items-center justify-center cursor-pointer group"
+                            >
+                                <div className={`text-[120px] leading-none font-black tracking-tighter transition-all duration-500 ${isApproaching ? "text-slate-900 scale-110" : "text-slate-200"}`}>
+                                    {eta}<span className="text-4xl align-top ml-2 text-slate-300 font-bold">min</span>
+                                </div>
+                                <p className="text-sm font-bold text-slate-400 mt-4 uppercase tracking-widest group-hover:text-blue-500 transition-colors">
+                                    {isApproaching ? "Tap to Start Service" : "Estimated Arrival"}
+                                </p>
+                            </div>
+
+                            {sessionId && (
+                                <div className="w-full bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-whiteShadow-sm">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-slate-200" />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900">Client Name</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase">Basic Haircut</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm font-bold text-slate-900">30€</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
-                )}
-
+                    )}
+                </div>
             </main>
         </div>
     );

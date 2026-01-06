@@ -39,6 +39,7 @@ interface MapWrapperProps {
     onStoreSelected?: (store: Store | null) => void;
     onRouteInfoUpdate?: (info: { distance: number; duration: number } | null) => void;
     onOverlayStateChange?: (isVisible: boolean) => void;
+    onSessionUpdate?: (session: any) => void;
     unifiedMode?: boolean;
 }
 
@@ -53,6 +54,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
     onStoreSelected,
     onRouteInfoUpdate,
     onOverlayStateChange,
+    onSessionUpdate,
     unifiedMode
 }, ref) => {
     const supabase = createClient();
@@ -260,6 +262,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
                         // 2. Reset State
                         setActiveSession(null);
+                        onSessionUpdate?.(null); // Notify parent
                         activeSessionRef.current = null;
                         setIsLocking(false);
                         onLockingChange?.(false);
@@ -310,8 +313,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             ] as [mapboxgl.LngLatLike, mapboxgl.LngLatLike];
 
             mapRef.current.fitBounds(expandedBounds, {
-                padding: { top: 100, bottom: 300, left: 50, right: 50 },
-                duration: 1000,
+                padding: { top: 50, bottom: 50, left: 50, right: 50 },
+                duration: 1500,
                 essential: true
             });
         }
@@ -352,6 +355,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         };
         console.log("Session Created (Normalized):", newSession);
         setActiveSession(newSession);
+        onSessionUpdate?.(newSession); // Notify parent
         activeSessionRef.current = newSession;
 
         // Start Countdown (simulated locally for UI, but backed by P2 timer on Pro side)
@@ -443,22 +447,54 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     </Marker>
                 )}
 
-                {/* Markers */}
+                {/* Custom Native Markers */}
                 {stores.slice(0, 4).filter(s => (!selectedStore) || s.id === selectedStore.id).map((store, index) => (
-                    <Marker key={store.id} latitude={store.lat} longitude={store.long} anchor="bottom" onClick={(e) => { e.originalEvent.stopPropagation(); if (!isLocking && !isRevealed) handleLock(store); }}>
+                    <Marker
+                        key={store.id}
+                        latitude={store.lat}
+                        longitude={store.long}
+                        anchor="bottom"
+                        onClick={(e) => {
+                            e.originalEvent.stopPropagation();
+                            if (!isLocking && !isRevealed) handleLock(store);
+                        }}
+                    >
                         {isRevealed || isLocking ? (
-                            <div className="flex flex-col items-center group cursor-pointer transition-transform hover:scale-110">
-                                <div className="bg-red-600 p-2 rounded-full shadow-2xl border-2 border-white animate-bounce-subtle">
-                                    <MapPin size={24} fill="white" className="text-white" />
+                            <div className="flex flex-col items-center group cursor-pointer">
+                                {/* Destination Pin (Red/Active) - Thinner Google Style */}
+                                <div className="relative">
+                                    <div className="absolute -inset-1 bg-red-500/20 rounded-full blur-sm animate-pulse"></div>
+                                    <div className="relative z-10 transform transition-transform hover:scale-110 drop-shadow-md">
+                                        <svg width="34" height="42" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 0C5.37258 0 0 5.37258 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37258 18.6274 0 12 0Z" fill="#EA4335" />
+                                            <circle cx="12" cy="12" r="5" fill="#781812" fillOpacity="0.2" />
+                                            <circle cx="12" cy="12" r="4" fill="white" />
+                                        </svg>
+                                    </div>
                                 </div>
-                                <div className="w-1.5 h-1.5 bg-red-600 rounded-full -mt-1 shadow-sm border border-white"></div>
+                                {/* Shadow Anchor */}
+                                <div className="w-1.5 h-1 bg-black/20 rounded-[100%] blur-[1px] mt-[-2px]"></div>
                             </div>
                         ) : (
-                            <div className={`flex items-center gap-2 p-1.5 rounded-full shadow-xl border-2 transition-all cursor-pointer hover:scale-105 active:scale-95 ${store.business_type === 'service' ? 'bg-white border-purple-600' : 'bg-white border-orange-500'}`}>
-                                <div className={`flex items-center justify-center h-8 w-8 rounded-full text-white font-bold text-sm shadow-inner ${store.business_type === 'service' ? 'bg-purple-600' : 'bg-orange-500'}`}>{index + 1}</div>
-                                <div className="flex flex-col pr-2 min-w-[60px]">
-                                    <span className="text-[10px] font-black uppercase tracking-tighter text-slate-800 leading-none">{store.category || store.business_type}</span>
-                                    <span className="text-[9px] font-bold text-slate-500">{store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}</span>
+                            <div className={`
+                                flex items-center gap-2 px-2.5 py-1.5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.12)] border border-white/60 backdrop-blur-md transition-all cursor-pointer hover:scale-105 active:scale-95 group
+                                ${store.business_type === 'service' ? 'bg-white/90' : 'bg-white/90'}
+                            `}>
+                                <div className={`
+                                    flex items-center justify-center h-7 w-7 rounded-lg text-white font-semibold text-[13px] shadow-sm
+                                    ${store.business_type === 'service' ? 'bg-gradient-to-br from-purple-500 to-purple-600' : 'bg-gradient-to-br from-orange-400 to-orange-500'}
+                                `}>
+                                    {index + 1}
+                                </div>
+                                <div className="flex flex-col pr-1 min-w-[60px]">
+                                    <span className="text-[13px] font-semibold tracking-tight text-slate-800 leading-none mb-0.5 group-hover:text-blue-600 transition-colors capitalize">
+                                        {/* Anonymized Name until Revealed */}
+                                        {isRevealed ? store.name : (store.category || store.business_type).replace('_', ' ')}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                                        {/* Subtitle logic */}
+                                        {isRevealed ? (store.category || store.business_type) : (store.business_type === 'service' ? 'Service' : 'Commerce')} • {store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
+                                    </span>
                                 </div>
                             </div>
                         )}
@@ -467,46 +503,21 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
                 {routeData && (
                     <Source id="route" type="geojson" data={routeData}>
-                        <Layer id="route-line" type="line" layout={{ 'line-join': 'round', 'line-cap': 'round' }} paint={{ 'line-color': '#3b82f6', 'line-width': 6, 'line-opacity': 0.8 }} />
+                        <Layer
+                            id="route-border"
+                            type="line"
+                            layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                            paint={{ 'line-color': '#fff', 'line-width': 8, 'line-opacity': 0.8 }}
+                        />
+                        <Layer
+                            id="route-line"
+                            type="line"
+                            layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                            paint={{ 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 1 }}
+                        />
                     </Source>
                 )}
             </Map>
-
-            {/* Pro Container (Detail Card) */}
-            {activeSession && selectedStore && !isLocking && (
-                <div className="absolute inset-x-4 bottom-8 z-40 animate-in slide-in-from-bottom duration-500">
-                    <Card className="w-full bg-white rounded-[32px] overflow-hidden border border-slate-100 shadow-xl">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-14 w-14 rounded-2xl bg-slate-100 relative overflow-hidden">
-                                        {/* Avatar Placeholder */}
-                                        <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300"></div>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-black text-slate-900 leading-tight">{selectedStore.name}</h3>
-                                        <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
-                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-md text-xs uppercase tracking-wider">Expert</span>
-                                            <span>• 4.9 ★</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-2xl font-black text-slate-900 tracking-tighter">12 min</div>
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Arrival</div>
-                                </div>
-                            </div>
-
-                            <Button
-                                onClick={handleArrival}
-                                className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-lg font-bold shadow-lg shadow-slate-200 transition-all active:scale-95"
-                            >
-                                I'm here
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
 
             {/* Note: All Overlays (Service, Payment, Completion) have been moved to separate pages:
                 - /client/service

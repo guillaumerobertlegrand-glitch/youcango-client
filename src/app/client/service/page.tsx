@@ -100,17 +100,36 @@ function ClientServiceContent() {
             </div>
 
             {/* Content centered */}
-            <div className="animate-in fade-in duration-700 z-10 flex flex-col items-center gap-8">
-                <div className="bg-white/80 backdrop-blur-md px-8 py-5 rounded-full shadow-xl border border-slate-100 flex items-center gap-5 transform scale-125">
-                    <div className="h-4 w-4 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-200" />
-                    <div className="flex flex-col">
-                        <span className="text-xl font-black text-slate-800 tracking-tight">Haircut in progress</span>
-                        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">By Victor</span>
+            <div className="animate-in fade-in duration-1000 z-10 flex flex-col items-center gap-12 max-w-[80vw]">
+                {/* Timer Circle */}
+                <div className="relative flex items-center justify-center w-64 h-64">
+                    {/* Pulsing rings */}
+                    <div className="absolute inset-0 bg-green-500/10 rounded-full animate-ping duration-[3s]" />
+                    <div className="absolute inset-4 bg-green-500/10 rounded-full animate-ping duration-[3s] delay-700" />
+
+                    <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/40 shadow-2xl backdrop-blur-3xl">
+                        <span className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Elapsed</span>
+                        <div className="text-5xl font-black text-slate-800 tracking-tighter tabular-nums variant-numeric-tabular-nums">
+                            12:45
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-green-100/50 rounded-full">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Active</span>
+                        </div>
                     </div>
                 </div>
 
-                <p className="text-slate-300 text-sm font-medium animate-pulse">Your map will return after service</p>
-                <p className="text-xs text-slate-200 font-mono mt-4">Session: {sessionId.slice(0, 8)}...</p>
+                <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Haircut in progress</h2>
+                    <p className="text-slate-400 font-medium">Relax, enjoy your service.</p>
+                </div>
+
+                <div className="absolute bottom-12 left-0 right-0 flex justify-center opacity-60">
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="w-10 h-1 rounded-full bg-slate-200" />
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Do not close</p>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Mic, AudioLines, Settings, Send } from "lucide-react";
+// useState, useEffect removed as this is a dumb component
+import { Plus, Mic, AudioLines, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/client";
 
 interface Message {
     id: string;
@@ -12,80 +11,58 @@ interface Message {
 }
 
 interface IntentCaptureProps {
-    onIntentCaptured: (intentData: any) => void;
+    messages: Message[];
+    inputValue: string;
+    onInputChange: (value: string) => void;
+    onSubmit: (e?: React.FormEvent) => void;
+    isInterpreting: boolean;
 }
 
-export default function IntentCapture({ onIntentCaptured }: IntentCaptureProps) {
-    const [inputValue, setInputValue] = useState("");
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [isInterpreting, setIsInterpreting] = useState(false);
-    const supabase = createClient();
-
-    const handleSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!inputValue.trim() || isInterpreting) return;
-
-        const userText = inputValue;
-        const newMessage: Message = {
-            id: Date.now().toString(),
-            text: userText,
-            sender: 'user'
-        };
-
-        setMessages(prev => [...prev, newMessage]);
-        setInputValue("");
-        setIsInterpreting(true);
-
-        const { data, error } = await supabase.functions.invoke('interpret-intent', {
-            body: { text: userText }
-        });
-
-        if (data?.result) {
-            setTimeout(() => {
-                onIntentCaptured(data.result);
-                setIsInterpreting(false);
-            }, 800);
-        } else {
-            console.error("AI Error:", error || "Unknown error");
-            setIsInterpreting(false);
-            // Fallback: transition anyway or show error
-            onIntentCaptured({ category: 'merchant', keywords: [userText], intent_summary: userText });
-        }
-    };
+export default function IntentCapture({
+    messages,
+    inputValue,
+    onInputChange,
+    onSubmit,
+    isInterpreting
+}: IntentCaptureProps) {
+    // No local state
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative overflow-hidden">
-            {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 bg-transparent">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 italic">YouCanGo</h1>
-                <Button variant="ghost" size="icon" className="text-slate-600">
-                    <Settings size={22} />
-                </Button>
-            </header>
+        <div className="flex flex-col h-full bg-white relative overflow-hidden">
+            {/* Header Removed - Managed by ClientHome */}
 
             {/* Conversation Area (Pills) */}
-            <div className="flex-1 px-4 py-6 overflow-y-auto space-y-4 flex flex-col justify-end pb-32">
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                        <div className={`
+            <div className="flex-1 px-4 py-6 overflow-y-auto min-h-0 z-10 relative">
+                <div className="flex flex-col justify-end min-h-full space-y-4 pb-32">
+                    {messages.map((msg) => (
+                        <div
+                            key={msg.id}
+                            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                            <div className={`
                             px-4 py-2 rounded-2xl max-w-[80%] text-sm font-medium
                             ${msg.sender === 'user'
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-slate-200 text-slate-800 rounded-bl-none'}
+                                    ? 'bg-blue-600 text-white rounded-br-none'
+                                    : 'bg-slate-200 text-slate-800 rounded-bl-none'}
                          shadow-sm`}>
-                            {msg.text}
+                                {msg.text}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                    {isInterpreting && (
+                        <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2">
+                            <div className="px-4 py-2 rounded-2xl text-sm font-medium bg-slate-100 text-slate-500 rounded-bl-none italic">
+                                Thinking...
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Input Area */}
             <div className="absolute bottom-6 left-0 right-0 px-4">
                 <form
-                    onSubmit={handleSubmit}
+                    onSubmit={onSubmit}
                     className="bg-white border border-slate-200 rounded-full flex items-center p-1.5 shadow-lg"
                 >
                     <Button
@@ -100,9 +77,10 @@ export default function IntentCapture({ onIntentCaptured }: IntentCaptureProps) 
                     <input
                         type="text"
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
+                        onChange={(e) => onInputChange(e.target.value)}
                         placeholder="What do you need?"
                         className="flex-1 bg-transparent px-2 py-2 text-slate-800 focus:outline-none placeholder:text-slate-400 font-medium"
+                        disabled={isInterpreting}
                     />
 
                     <div className="flex items-center gap-1">
@@ -111,6 +89,7 @@ export default function IntentCapture({ onIntentCaptured }: IntentCaptureProps) 
                                 type="submit"
                                 size="icon"
                                 className="rounded-full bg-blue-600 text-white h-10 w-10 hover:bg-blue-700 transition-all scale-100 animate-in zoom-in"
+                                disabled={isInterpreting}
                             >
                                 <Send size={18} />
                             </Button>
@@ -141,3 +120,5 @@ export default function IntentCapture({ onIntentCaptured }: IntentCaptureProps) 
         </div>
     );
 }
+
+
