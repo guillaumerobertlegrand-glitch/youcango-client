@@ -530,8 +530,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                                         {isRevealed ? store.name : (store.category || store.business_type).replace('_', ' ')}
                                     </span>
                                     <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-                                        {/* Subtitle logic */}
-                                        {isRevealed ? (store.category || store.business_type) : (store.business_type === 'service' ? 'Service' : 'Commerce')} • {store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
+                                        {/* Subtitle: C2 = Distance only. C3 = Category + Distance */}
+                                        {isRevealed ? `${store.category || store.business_type} • ` : ''}{store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
                                     </span>
                                 </div>
                             </div>

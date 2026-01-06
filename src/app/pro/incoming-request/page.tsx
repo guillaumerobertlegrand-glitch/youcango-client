@@ -92,61 +92,48 @@ export default function IncomingRequestPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative overflow-hidden">
+        <div className="flex flex-col h-full w-full">
+            {/* Chat Bubble Pill (Left Aligned) */}
+            <div className="self-start bg-slate-200 rounded-2xl rounded-tl-none px-6 py-3 mb-8 shadow-sm animate-in fade-in slide-in-from-left duration-500">
+                <span className="font-bold text-slate-700 text-sm">
+                    {REQUEST_DATA.customerStatus}
+                </span>
+            </div>
 
-            {/* Custom Header */}
-            <header className="px-6 py-6 flex items-center justify-between">
-                <h1 className="text-2xl font-black tracking-tight">YouCanGo</h1>
-                <Button variant="ghost" size="icon" className="text-slate-900">
-                    <Settings size={24} />
-                </Button>
-            </header>
-
-            <main className="flex-1 flex flex-col px-6 pt-6 pb-6 w-full max-w-md mx-auto">
-
-                {/* Chat Bubble Pill (Left Aligned) */}
-                <div className="self-start bg-slate-200 rounded-2xl rounded-tl-none px-6 py-3 mb-8 shadow-sm animate-in fade-in slide-in-from-left duration-500">
-                    <span className="font-bold text-slate-700 text-sm">
-                        {REQUEST_DATA.customerStatus}
-                    </span>
+            {/* Main Request Card */}
+            <Card className="w-full bg-slate-800 border-0 shadow-2xl rounded-[32px] overflow-hidden mb-6 aspect-[4/3] flex items-center justify-center relative group animate-in zoom-in-95 duration-500">
+                <div className="text-center p-6">
+                    <h2 className="text-3xl font-black text-white leading-tight underline decoration-blue-500 decoration-4 underline-offset-8">
+                        {REQUEST_DATA.serviceTitle}
+                    </h2>
                 </div>
+            </Card>
 
-                {/* Main Request Card */}
-                <Card className="w-full bg-slate-800 border-0 shadow-2xl rounded-[32px] overflow-hidden mb-6 aspect-[4/3] flex items-center justify-center relative group animate-in zoom-in-95 duration-500">
-                    <div className="text-center p-6">
-                        <h2 className="text-3xl font-black text-white leading-tight underline decoration-blue-500 decoration-4 underline-offset-8">
-                            {REQUEST_DATA.serviceTitle}
-                        </h2>
-                    </div>
-                </Card>
-
-                {/* Details */}
-                <div className="w-full space-y-2 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200">
-                    <div className="text-xl font-bold text-slate-900">
-                        {REQUEST_DATA.serviceType} - {REQUEST_DATA.duration}
-                    </div>
-                    <div className="text-lg font-medium text-slate-500">
-                        Expected arrival - {REQUEST_DATA.eta}
-                    </div>
+            {/* Details */}
+            <div className="w-full space-y-2 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200">
+                <div className="text-xl font-bold text-slate-900">
+                    {REQUEST_DATA.serviceType} - {REQUEST_DATA.duration}
                 </div>
-
-                {/* Spacer */}
-                <div className="flex-1" />
-
-                {/* Decline Button with Unfilling Progress */}
-                <div className="w-full relative h-16 rounded-[20px] overflow-hidden shadow-sm border border-slate-300 bg-slate-100 cursor-pointer active:scale-95 transition-all" onClick={handleDecline}>
-                    {/* Progress Bar Background */}
-                    <div
-                        className="absolute left-0 top-0 bottom-0 bg-slate-300/50 transition-all duration-100 ease-linear"
-                        style={{ width: `${progress}%` }}
-                    />
-                    {/* Label */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 z-10">
-                        <span className="text-slate-600 font-bold text-lg">Decline?</span>
-                    </div>
+                <div className="text-lg font-medium text-slate-500">
+                    Expected arrival - {REQUEST_DATA.eta}
                 </div>
+            </div>
 
-            </main>
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Decline Button with Unfilling Progress */}
+            <div className="w-full relative h-16 rounded-[20px] overflow-hidden shadow-sm border border-slate-300 bg-slate-100 cursor-pointer active:scale-95 transition-all" onClick={handleDecline}>
+                {/* Progress Bar Background */}
+                <div
+                    className="absolute left-0 top-0 bottom-0 bg-slate-300/50 transition-all duration-100 ease-linear"
+                    style={{ width: `${progress}%` }}
+                />
+                {/* Label */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2 z-10">
+                    <span className="text-slate-600 font-bold text-lg">Decline?</span>
+                </div>
+            </div>
         </div>
     );
 }

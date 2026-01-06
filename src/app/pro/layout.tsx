@@ -18,41 +18,27 @@ export default function ProLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <div className={`min-h-screen bg-slate-50 flex flex-col font-sans ${inter.className}`}>
+        <main className={`flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative font-sans ${inter.className}`}>
             <ProSessionListener />
-            {/* Pro Header (Native Style) */}
-            <header className="fixed top-0 left-0 right-0 z-50 glass pt-safe-top px-6 pb-2 border-b border-slate-200/50">
+
+            {/* Pro Header (Flex Item - Stays at top) */}
+            <header className="flex-shrink-0 z-50 glass pt-12 pb-2 px-6 border-b border-slate-200/50">
                 <div className="flex items-center justify-between h-[44px]">
-                    <div className="flex flex-col justify-center">
-                        <h1 className="text-[17px] font-black tracking-tight text-slate-900 leading-none">YouCanGo</h1>
-                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Partner</span>
+                    <div className="flex items-center gap-1">
+                        <h1 className="text-2xl font-black tracking-tighter text-slate-900 leading-none">YouCanGo</h1>
+                        <span className="text-2xl font-black tracking-tighter text-slate-400">Pro</span>
                     </div>
+                    {/* Settings Gear */}
+                    <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
+                        <Settings size={34} className="stroke-[2.5px]" />
+                    </Button>
                 </div>
             </header>
 
-            {/* Scrollable Content (Safe Area Padding) */}
-            <main className="flex-1 overflow-y-auto pb-32 pt-24 px-4 hide-scrollbar">
+            {/* Scrollable Content (Fills remaining space) */}
+            <div className="flex-1 overflow-y-auto px-4 pb-6 hide-scrollbar relative">
                 {children}
-            </main>
-
-            {/* Bottom Navigation (Floating Glass) */}
-            <nav className="fixed bottom-6 left-4 right-4 z-50 glass-card rounded-3xl p-1 flex justify-between items-center bg-white/90">
-                <Link href="/pro" className="flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 hover:text-blue-600 transition-colors group">
-                    <LayoutDashboard size={24} className="group-hover:scale-110 transition-transform" />
-                </Link>
-
-                <div className="w-px h-8 bg-slate-200"></div>
-
-                <Link href="/pro/services" className="flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 hover:text-blue-600 transition-colors group">
-                    <List size={24} className="group-hover:scale-110 transition-transform" />
-                </Link>
-
-                <div className="w-px h-8 bg-slate-200"></div>
-
-                <Link href="/pro/settings" className="flex-1 flex flex-col items-center gap-1 py-3 text-slate-400 hover:text-blue-600 transition-colors group">
-                    <Settings size={24} className="group-hover:scale-110 transition-transform" />
-                </Link>
-            </nav>
-        </div>
+            </div>
+        </main>
     );
 }

@@ -108,26 +108,12 @@ export default function ProDashboard() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 space-y-12 max-w-md mx-auto animate-in fade-in duration-700">
+        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700">
 
-            {/* Big Status Indicator */}
-            <div className="text-center space-y-4">
-                <div className={`mx-auto h-32 w-32 rounded-full flex items-center justify-center transition-all duration-500 shadow-2xl ${isOnline ? 'bg-green-500 shadow-green-200' : 'bg-slate-100 shadow-slate-200'
-                    }`}>
-                    {isChecking ? (
-                        <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-                    ) : isOnline ? (
-                        <CheckCircle2 className="h-16 w-16 text-white animate-in zoom-in spin-in-12 duration-500" />
-                    ) : (
-                        <div className="h-8 w-8 rounded-full bg-slate-300" />
-                    )}
-                </div>
-
-                <h2 className={`text-2xl font-black tracking-tight transition-colors duration-300 ${isOnline ? 'text-green-600' : 'text-slate-300'
-                    }`}>
-                    {isChecking ? 'VÉRIFICATION...' : isOnline ? 'JE SUIS DISPONIBLE' : 'HORS LIGNE'}
-                </h2>
-            </div>
+            {/* Status Text (Simplified) */}
+            <h2 className={`text-3xl font-bold tracking-tight transition-colors duration-300 text-center ${isOnline ? 'text-green-600' : 'text-slate-400'}`}>
+                {isChecking ? 'Checking...' : isOnline ? 'Available' : 'Unavailable'}
+            </h2>
 
             {/* The ONE Toggle */}
             <div className="scale-150">
@@ -139,25 +125,7 @@ export default function ProDashboard() {
                 />
             </div>
 
-            {/* Feedback Message */}
-            {statusMessage && (
-                <div className={`text-sm font-bold text-center px-6 py-3 rounded-2xl animate-in fade-in slide-in-from-bottom-4 ${statusMessage.includes("Trop loin") || statusMessage.includes("Impossible")
-                    ? 'bg-red-50 text-red-600'
-                    : statusMessage.includes("Vérification")
-                        ? 'bg-blue-50 text-blue-600'
-                        : 'bg-green-50 text-green-600'
-                    }`}>
-                    {statusMessage.includes("Trop loin") && <MapPin className="inline-block mr-2 h-4 w-4" />}
-                    {statusMessage}
-                </div>
-            )}
-
-            {/* Hint */}
-            {!isOnline && !isChecking && (
-                <p className="text-center text-slate-400 text-xs font-medium max-w-[200px]">
-                    Activez pour recevoir des demandes. Votre présence sur site sera vérifiée automatiquement.
-                </p>
-            )}
+            {/* Feedback Message Removed as requested */}
 
         </div>
     );
