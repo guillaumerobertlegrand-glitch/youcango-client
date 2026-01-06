@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
+import { Settings, X } from "lucide-react"; // Icons for header and backspace
 
 export default function ClientPaymentPage() {
     const router = useRouter();
@@ -12,9 +13,12 @@ export default function ClientPaymentPage() {
     const supabase = createClient();
 
     const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
-    const [paymentTimer, setPaymentTimer] = useState(5);
+    const [timeLeft, setTimeLeft] = useState(8.0);
+    const [rewardVisible, setRewardVisible] = useState(true);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-    // Initial Fetch & Realtime Subs
+    const TOTAL_TIME = 8.0;
+
     // Initial Fetch & Realtime Subs
     useEffect(() => {
         if (!sessionId) {
@@ -34,20 +38,20 @@ export default function ClientPaymentPage() {
 
             if (session) {
                 if (session.payment_status === 'paid') {
-                    router.push(`/client/completion?session_id=${sessionId}`);
+                    // Already Paid -> Redirect to C1 or C7? 
+                    // If we consider C6 IS the final step, then redirect home.
+                    router.push('/');
                     return true;
                 }
-                // Update local state if amount appears
                 if (session.amount) {
                     setPaymentAmount(session.amount);
-                    return true; // Found amount
+                    return true;
                 }
             }
             return false;
         };
 
         const initRealtime = async () => {
-            // 1. Initial State Check
             await checkStatus();
 
             channel = supabase
@@ -63,9 +67,6 @@ export default function ClientPaymentPage() {
                     (payload) => {
                         console.log("[ClientPayment] Update:", payload);
                         if (payload.new.payment_status === 'paid') {
-                            router.push(`/client/completion?session_id=${sessionId}`);
-                        } else if (payload.new.payment_status === 'failed') {
-                            alert("Payment Failed/Rejected");
                             router.push('/');
                         } else if (payload.new.amount && !paymentAmount) {
                             setPaymentAmount(payload.new.amount);
@@ -77,11 +78,7 @@ export default function ClientPaymentPage() {
 
         initRealtime();
 
-        // 3. Fallback Polling (3s)
-        pollInterval = setInterval(() => {
-            console.log("[ClientPayment] Polling...");
-            checkStatus();
-        }, 3000);
+        pollInterval = setInterval(checkStatus, 3000);
 
         return () => {
             clearInterval(pollInterval);
@@ -89,94 +86,138 @@ export default function ClientPaymentPage() {
         };
     }, [sessionId, router, supabase, paymentAmount]);
 
-    // Timer Logic
+    // Passive Validation Logic
     useEffect(() => {
-        if (!paymentAmount) return; // Don't start timer until amount shows
+        if (!paymentAmount) return; // Wait for amount
 
+        // Reward pill fade out
+        const rewardTimer = setTimeout(() => {
+            setRewardVisible(false);
+        }, 2500);
+
+        // Countdown
         const interval = setInterval(() => {
-            setPaymentTimer((prev) => {
-                if (prev <= 1) {
+            setTimeLeft((prev) => {
+                const next = prev - 0.05;
+                if (next <= 0) {
                     clearInterval(interval);
-                    handleAutoPay();
+                    handleAutoValidation();
                     return 0;
                 }
-                return prev - 1;
+                return next;
             });
-        }, 1000);
+        }, 50);
 
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(rewardTimer);
+            clearInterval(interval);
+        };
     }, [paymentAmount]);
 
-    const handleAutoPay = async () => {
-        if (!sessionId) return;
-        console.log("Auto-finalizing payment...");
+    const handleAutoValidation = async () => {
+        if (!sessionId || isProcessing) return;
+        setIsProcessing(true);
+        console.log("Auto-validating payment...");
+
         const { error } = await supabase.rpc('api_v1_finalize_payment', {
             p_session_id: sessionId
         });
 
-        if (error) {
-            console.error("Auto-Payment Error:", error);
-            alert("Payment Processing Failed: " + error.message);
+        if (!error) {
+            console.log("Payment Finalized. Redirecting...");
+            router.push('/'); // Success -> Home
         } else {
-            console.log("Auto-Payment Triggered. Waiting for Redirect...");
+            console.error("Auto-Payment Error:", error);
+            setIsProcessing(false);
         }
     };
 
-    const handleReject = async () => {
+    const handleCancel = async () => {
         if (!sessionId) return;
+        console.log("Cancelling payment...");
         await supabase.rpc('api_v1_reject_payment', { p_session_id: sessionId });
-        router.push('/'); // Or back to service? For now home.
+        router.push('/');
     };
 
+    const progressPercentage = (timeLeft / TOTAL_TIME) * 100;
+
+    // Loading State
     if (!paymentAmount) {
         return (
-            <div className="min-h-screen bg-white flex items-center justify-center">
-                <div className="animate-pulse flex flex-col items-center">
-                    <div className="h-4 w-4 bg-slate-200 rounded-full mb-2"></div>
-                    <p className="text-slate-400 font-bold text-sm">Waiting for invoice...</p>
+            <main className="flex flex-col h-screen bg-white max-w-md mx-auto relative overflow-hidden font-sans">
+                {/* Header */}
+                <header className="flex-shrink-0 z-50 px-6 pt-12 pb-4 flex items-center justify-between">
+                    <h1 className="text-2xl font-black tracking-tighter text-slate-900 cursor-default">
+                        YouCanGo
+                    </h1>
+                    <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
+                        <Settings size={28} className="stroke-[2.5px]" />
+                    </Button>
+                </header>
+
+                <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in duration-700">
+                    <div className="animate-pulse flex flex-col items-center">
+                        <div className="h-4 w-4 bg-slate-200 rounded-full mb-3"></div>
+                        <p className="text-slate-400 font-bold text-sm">Waiting for payment...</p>
+                    </div>
                 </div>
-            </div>
+            </main>
         );
     }
 
+    // Passive Validation UI
     return (
-        <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-            <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-100 rounded-full blur-[120px]" />
-                <div className="absolute bottom-0 left-0 w-96 h-96 bg-green-100 rounded-full blur-[120px]" />
-            </div>
+        <main className="flex flex-col h-screen bg-white max-w-md mx-auto relative overflow-hidden font-sans">
+            {/* Header */}
+            <header className="flex-shrink-0 z-50 px-6 pt-12 pb-4 flex items-center justify-between">
+                <h1 className="text-2xl font-black tracking-tighter text-slate-900 cursor-default">
+                    YouCanGo
+                </h1>
+                <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
+                    <Settings size={28} className="stroke-[2.5px]" />
+                </Button>
+            </header>
 
-            <div className="w-full max-w-sm bg-white border border-slate-100 shadow-2xl rounded-[40px] p-8 flex flex-col items-center relative overflow-hidden z-10 animate-in slide-in-from-bottom-8 duration-700">
-                {/* Timer Progress Bar */}
-                <div
-                    className="absolute bottom-0 left-0 h-2 bg-green-500 transition-all duration-1000 ease-linear"
-                    style={{ width: `${(paymentTimer / 5) * 100}%` }}
-                />
+            <div className="flex-1 flex flex-col justify-center px-6 relative animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-                <span className="text-sm font-black text-green-600 uppercase tracking-widest mb-6">Payment Request</span>
-
-                <div className="text-7xl font-black text-slate-900 mb-2 tracking-tighter">
-                    {paymentAmount.toFixed(2)}€
+                {/* Reward Pill - Ephemeral */}
+                <div className={`transition-opacity duration-1000 mb-8 absolute top-[20%] left-6 ${rewardVisible ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="bg-green-100 text-green-700 font-bold px-4 py-2 rounded-full text-sm inline-block shadow-sm">
+                        New reward added
+                    </div>
                 </div>
-                <p className="text-slate-400 text-base font-bold mb-10">For your hair service</p>
 
-                <div className="flex flex-col w-full gap-4">
-                    <Button
-                        className="w-full h-16 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg shadow-lg"
-                        disabled // It's auto
-                    >
-                        Processing... {paymentTimer}s
-                    </Button>
+                {/* Amount with Progress Bar Background */}
+                <div className="relative w-full h-24 bg-slate-100 rounded-full overflow-hidden mb-4 border border-slate-200">
+                    <div
+                        className="absolute inset-y-0 left-0 bg-slate-200 transition-all duration-[50ms] ease-linear origin-left"
+                        style={{ width: `${progressPercentage}%` }}
+                    />
 
-                    <Button
-                        variant="ghost"
-                        className="w-full h-12 text-slate-400 font-bold hover:text-red-500 hover:bg-red-50 rounded-xl"
-                        onClick={handleReject}
-                    >
-                        Reject / Dispute
-                    </Button>
+                    {/* Amount Text (Centered on top) */}
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                        <span className="text-4xl font-black text-slate-800 tracking-tighter">
+                            {paymentAmount.toFixed(2)}€
+                        </span>
+                    </div>
                 </div>
+
+                <div className="flex justify-between items-start mb-12 px-2">
+                    <div className="flex-1" />
+
+                    {/* Cancel Button (Dark Grey X) */}
+                    <div className="flex flex-col items-center gap-1">
+                        <button
+                            onClick={handleCancel}
+                            className="h-14 w-14 rounded-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all active:scale-95"
+                        >
+                            <X size={28} strokeWidth={3} />
+                        </button>
+                        <span className="text-slate-400 text-xs font-medium">Cancel payment</span>
+                    </div>
+                </div>
+
             </div>
-        </div>
+        </main>
     );
 }

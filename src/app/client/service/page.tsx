@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { Settings } from "lucide-react"; // Import Settings icon
+import { Button } from "@/components/ui/button";
 
 function ClientServiceContent() {
     const router = useRouter();
@@ -92,46 +94,43 @@ function ClientServiceContent() {
     if (!sessionId) return null;
 
     return (
-        <div className="min-h-screen bg-white flex flex-col font-sans items-center justify-center relative overflow-hidden">
-            {/* Background Decoration */}
-            <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-50 rounded-full blur-[100px]" />
-                <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-slate-50 rounded-full blur-[100px]" />
-            </div>
+        <main className="flex flex-col h-screen bg-white max-w-md mx-auto relative overflow-hidden font-sans">
+            {/* Native-like Status Bar / Header */}
+            <header className="flex-shrink-0 z-50 px-6 pt-12 pb-4 glass flex items-center justify-between relative bg-white/50 backdrop-blur-md">
+                <h1 className="text-2xl font-black tracking-tighter text-slate-900 cursor-default">
+                    YouCanGo
+                </h1>
+                <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
+                    <Settings size={28} className="stroke-[2.5px]" />
+                </Button>
+            </header>
 
-            {/* Content centered */}
-            <div className="animate-in fade-in duration-1000 z-10 flex flex-col items-center gap-12 max-w-[80vw]">
-                {/* Timer Circle */}
-                <div className="relative flex items-center justify-center w-64 h-64">
-                    {/* Pulsing rings */}
-                    <div className="absolute inset-0 bg-green-500/10 rounded-full animate-ping duration-[3s]" />
-                    <div className="absolute inset-4 bg-green-500/10 rounded-full animate-ping duration-[3s] delay-700" />
+            {/* Main Content Area */}
+            <div className="flex-1 relative flex flex-col items-center justify-center">
 
-                    <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/40 shadow-2xl backdrop-blur-3xl">
-                        <span className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Elapsed</span>
-                        <div className="text-5xl font-black text-slate-800 tracking-tighter tabular-nums variant-numeric-tabular-nums">
-                            12:45
-                        </div>
-                        <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-green-100/50 rounded-full">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-[10px] font-bold text-green-700 uppercase tracking-widest">Active</span>
+                {/* Background Decoration */}
+                <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+                    <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-50 rounded-full blur-[100px]" />
+                    <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-slate-50 rounded-full blur-[100px]" />
+                </div>
+
+                {/* Content centered */}
+                <div className="animate-in fade-in duration-1000 z-10 flex flex-col items-center gap-12 w-full px-6">
+                    {/* Zen Circle */}
+                    <div className="relative flex items-center justify-center w-72 h-72">
+                        {/* Soft Pulsing rings - Zen style (slower, cleaner) */}
+                        <div className="absolute inset-0 bg-green-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                        <div className="absolute inset-8 bg-green-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] delay-1000" />
+
+                        <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-3xl bg-white/40">
+                            <h2 className="text-2xl font-bold text-slate-800 tracking-tight text-center px-6 leading-tight">
+                                Haircut<br />in progress
+                            </h2>
                         </div>
                     </div>
                 </div>
-
-                <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Haircut in progress</h2>
-                    <p className="text-slate-400 font-medium">Relax, enjoy your service.</p>
-                </div>
-
-                <div className="absolute bottom-12 left-0 right-0 flex justify-center opacity-60">
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="w-10 h-1 rounded-full bg-slate-200" />
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Do not close</p>
-                    </div>
-                </div>
             </div>
-        </div>
+        </main>
     );
 }
 
