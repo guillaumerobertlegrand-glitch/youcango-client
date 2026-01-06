@@ -57,7 +57,7 @@ export default function ClientCompletionPage() {
                     YouCanGo
                 </h1>
                 <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
-                    <Settings size={28} className="stroke-[2.5px]" />
+                    <Settings size={34} className="stroke-[2.5px]" />
                 </Button>
             </header>
 

@@ -174,7 +174,7 @@ export default function ClientPaymentPage() {
                     YouCanGo
                 </h1>
                 <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
-                    <Settings size={28} className="stroke-[2.5px]" />
+                    <Settings size={34} className="stroke-[2.5px]" />
                 </Button>
             </header>
 
@@ -211,7 +211,7 @@ export default function ClientPaymentPage() {
                             onClick={handleCancel}
                             className="h-14 w-14 rounded-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all active:scale-95"
                         >
-                            <X size={28} strokeWidth={3} />
+                            <X size={28} strokeWidth={4} />
                         </button>
                         <span className="text-slate-400 text-xs font-medium">Cancel payment</span>
                     </div>
