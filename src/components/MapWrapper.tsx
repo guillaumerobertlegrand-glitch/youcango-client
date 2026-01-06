@@ -38,6 +38,7 @@ interface MapWrapperProps {
     onLockProgress?: (progress: number) => void;
     onStoreSelected?: (store: Store | null) => void;
     onRouteInfoUpdate?: (info: { distance: number; duration: number } | null) => void;
+    onSimulationProgress?: (progress: number) => void;
     onOverlayStateChange?: (isVisible: boolean) => void;
     onSessionUpdate?: (session: any) => void;
     unifiedMode?: boolean;
@@ -53,6 +54,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
     onLockProgress,
     onStoreSelected,
     onRouteInfoUpdate,
+    onSimulationProgress,
     onOverlayStateChange,
     onSessionUpdate,
     unifiedMode
@@ -375,9 +377,10 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 onRouteInfoUpdate?.(info);
 
                 if (mapRef.current) {
-                    const coords = data.geometry.coordinates;
-                    const b = coords.reduce((acc: any, coord: any) => [[Math.min(acc[0][0], coord[0]), Math.min(acc[0][1], coord[1])], [Math.max(acc[1][0], coord[0]), Math.max(acc[1][1], coord[1])]], [[coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]]);
-                    mapRef.current.fitBounds(b, { padding: { top: 80, bottom: 300, left: 50, right: 50 }, duration: 2000, essential: true });
+                    // User requested to KEEP the zoom from Locking phase.
+                    // const coords = data.geometry.coordinates;
+                    // const b = coords.reduce((acc: any, coord: any) => [[Math.min(acc[0][0], coord[0]), Math.min(acc[0][1], coord[1])], [Math.max(acc[1][0], coord[0]), Math.max(acc[1][1], coord[1])]], [[coords[0][0], coords[0][1]], [coords[0][0], coords[0][1]]]);
+                    // mapRef.current.fitBounds(b, { padding: { top: 80, bottom: 300, left: 50, right: 50 }, duration: 2000, essential: true });
                 }
             }
         } catch (error) { console.error("Error fetching directions:", error); }
@@ -420,6 +423,41 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         router.push(`/client/service?session_id=${activeSession.id}`);
         await supabase.rpc('api_v1_start_service', { p_session_id: activeSession.id });
     };
+
+    // Simulation Logic (Option #1: Path Interpolation)
+    useEffect(() => {
+        if (!isRevealed || !routeData || !userLocation) return;
+
+        console.log("[MapWrapper] Starting Simulation on Route Path...");
+        const coords = routeData.geometry.coordinates; // [[long, lat], ...]
+        let currentIndex = 0;
+
+        // Find closest point on path to start (simple approximation: start at 0)
+        // Ideally we project current userLocation to path, but for demo, starting at 0 is fine if user is at start.
+
+        const speedFactor = 5; // Skip points to speed up (adjust based on path density)
+        // Target 45 seconds to cover the path (matching Pro P3/P4 flow)
+        const TARGET_DURATION_MS = 45000;
+        const tickInterval = Math.max(50, TARGET_DURATION_MS / coords.length);
+
+        const simulationInterval = setInterval(() => {
+            if (currentIndex >= coords.length) {
+                clearInterval(simulationInterval);
+                console.log("[MapWrapper] Simulation Arrived at destination");
+                // Optional: Trigger arrival automatically? No, let user click "I'm here".
+                return;
+            }
+
+            const nextPoint = coords[currentIndex];
+            setUserLocation({ long: nextPoint[0], lat: nextPoint[1] });
+
+            onSimulationProgress?.(currentIndex / coords.length);
+
+            currentIndex += 1;
+        }, tickInterval);
+
+        return () => clearInterval(simulationInterval);
+    }, [isRevealed, !!routeData]);
 
     return (
         <div className={`relative w-full h-full overflow-hidden ${unifiedMode ? '' : 'fixed inset-0'}`}>

@@ -37,6 +37,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     const [selectedStore, setSelectedStore] = useState<any>(null);
     const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null);
     const [activeSession, setActiveSession] = useState<any>(null);
+    const [simProgress, setSimProgress] = useState(0);
 
     const mapRef = useRef<any>(null);
     const supabase = createClient();
@@ -153,37 +154,92 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                 onRouteInfoUpdate={setRouteInfo}
                                 onOverlayStateChange={setIsOverlayVisible}
                                 onSessionUpdate={setActiveSession}
+                                onSimulationProgress={setSimProgress}
                                 unifiedMode={true}
                             />
                         </div>
 
-                        {/* Message Stream - Remaining Space (Bottom Part) */}
-                        {!isOverlayVisible && (!activeSession || isLocking) && (
-                            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] space-y-3 relative z-20">
-                                {messages.map((msg) => (
-                                    <div key={msg.id} className="flex justify-start"> {/* Align Left or Right for history? User pills usually right */}
-                                        <div className={`
+                        {/* Message Stream OR Pro Reveal Card (Bottom Part) */}
+                        {(!activeSession || isLocking) ? (
+                            !isOverlayVisible && (
+                                <div className="flex-1 overflow-y-auto px-4 pt-4 pb-20 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.05)] space-y-3 relative z-20">
+                                    {messages.map((msg) => (
+                                        <div key={msg.id} className="flex justify-start">
+                                            <div className={`
                                             px-4 py-2 rounded-2xl max-w-[90%] text-sm font-medium shadow-sm
                                             ${msg.sender === 'user'
-                                                ? 'bg-blue-600 text-white rounded-br-none ml-auto'
-                                                : 'bg-slate-100 text-slate-800 rounded-bl-none'}
+                                                    ? 'bg-blue-600 text-white rounded-br-none ml-auto'
+                                                    : 'bg-slate-100 text-slate-800 rounded-bl-none'}
                                         `}>
-                                            {msg.text}
+                                                {msg.text}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
 
-                                {!isLoading && !isGuiding && (
-                                    <div className="flex justify-start animate-in fade-in slide-in-from-left duration-500">
-                                        <div className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-800 text-sm font-medium rounded-bl-none shadow-sm capitalize flex items-center gap-2">
-                                            <span className="relative flex h-2 w-2">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                            </span>
-                                            {(intentData?.extracted_category || intentData?.category || 'Searching...').replace('_', ' ')} - available now
+                                    {!isLoading && !isGuiding && (
+                                        <div className="flex justify-start animate-in fade-in slide-in-from-left duration-500">
+                                            <div className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-800 text-sm font-medium rounded-bl-none shadow-sm capitalize flex items-center gap-2">
+                                                <span className="relative flex h-2 w-2">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                </span>
+                                                {(intentData?.extracted_category || intentData?.category || 'Searching...').replace('_', ' ')} - available now
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        ) : (
+                            /* C4 Pro Reveal Card (Embedded) */
+                            <div className="flex-1 bg-slate-50 relative z-20 p-6 animate-in slide-in-from-bottom duration-500 flex flex-col justify-start">
+                                <div className="bg-white rounded-[24px] p-5 shadow-sm border border-slate-100">
+                                    {/* Pro Info Header */}
+                                    <div className="flex items-start justify-between mb-5">
+                                        <div className="flex items-center gap-4">
+                                            {/* Avatar (Pro Photo) */}
+                                            <div className="h-16 w-16 rounded-full bg-slate-200 shadow-sm border-2 border-white relative overflow-hidden flex-shrink-0">
+                                                <img
+                                                    src="/avatars/barber-mike.jpg"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                    alt="Mike"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center text-slate-400 font-bold text-xl -z-10">
+                                                    M
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-[18px] font-bold text-slate-900 leading-tight tracking-tight capitalize">
+                                                        {selectedStore?.name || 'Dandy Barber'}
+                                                    </h3>
+                                                </div>
+                                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                                    <span className="text-[14px] text-slate-600 font-semibold leading-snug">
+                                                        Mike
+                                                    </span>
+                                                    <span className="text-[13px] text-slate-400 font-medium leading-snug">
+                                                        {selectedStore?.address || '12 Rue de Rivoli, 75001 Paris'}
+                                                    </span>
+                                                    <span className="text-[13px] text-blue-600 font-medium mt-1">
+                                                        01 42 33 44 55
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ETA */}
+                                        <div className="text-right flex-shrink-0">
+                                            <div className="text-2xl font-black text-slate-900 tracking-tighter">
+                                                {Math.max(1, Math.ceil((routeInfo?.duration ? (routeInfo.duration / 60) : 12) * (1 - simProgress)))}
+                                                <span className="text-sm font-bold text-slate-400 ml-1">min</span>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
+
+
+                                </div>
                             </div>
                         )}
                     </div>
@@ -256,70 +312,6 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                     </div>
                 )
             }
-
-            {/* C4 Detail Card - Bottom Container (Replacing Pills & Input) */}
-            {
-                selectedStore && !isLocking && !isOverlayVisible && activeSession && (
-                    <div className="absolute bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 animate-in slide-in-from-bottom duration-500">
-                        <div className="glass-card rounded-[32px] p-1 shadow-2xl">
-                            <div className="bg-white/50 rounded-[28px] p-5">
-                                {/* Pro Info Header */}
-                                <div className="flex items-start justify-between mb-5">
-                                    <div className="flex items-center gap-4">
-                                        {/* Avatar (Pro Photo) */}
-                                        <div className="h-14 w-14 rounded-full bg-slate-200 shadow-sm border-2 border-white relative overflow-hidden flex-shrink-0">
-                                            {/* Placeholder Avatar */}
-                                            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center text-slate-400 font-bold text-xl">
-                                                {isGuiding && selectedStore.name ? selectedStore.name[0] : 'P'}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-col">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-[17px] font-bold text-slate-900 leading-tight tracking-tight capitalize">
-                                                    {isGuiding ? selectedStore.name : (selectedStore.category || selectedStore.business_type).replace('_', ' ')}
-                                                </h3>
-                                            </div>
-
-                                            {isGuiding && (
-                                                <div className="flex flex-col gap-0.5 mt-0.5">
-                                                    <span className="text-[13px] text-slate-500 font-medium leading-snug">
-                                                        {selectedStore.address || '12 Rue de Rivoli, 75001 Paris'}
-                                                    </span>
-                                                    <span className="text-[13px] text-blue-600 font-medium">
-                                                        01 42 33 44 55
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {!isGuiding && (
-                                                <span className="text-[13px] text-slate-400 font-medium">
-                                                    Address hidden until confirmed
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* ETA / Distance */}
-                                    <div className="text-right flex-shrink-0">
-                                        <div className="text-2xl font-black text-slate-900 tracking-tighter">12 <span className="text-sm font-bold text-slate-400">min</span></div>
-                                    </div>
-                                </div>
-
-                                <Button
-                                    onClick={() => mapRef.current?.handleArrival?.()}
-                                    className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-[17px] font-bold shadow-lg shadow-slate-200/50 transition-all active:scale-95 flex items-center justify-between px-6 group"
-                                >
-                                    <span>I'm here</span>
-                                    <div className="bg-white/20 rounded-full p-1 group-hover:translate-x-1 transition-transform">
-                                        <Navigation size={18} className="fill-current" />
-                                    </div>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
             <div className="absolute inset-0 -z-10 opacity-20 pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-50 rounded-full blur-[100px]" />
                 <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-slate-100 rounded-full blur-[100px]" />
