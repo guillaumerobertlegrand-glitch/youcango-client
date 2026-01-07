@@ -124,7 +124,7 @@ function ClientServiceContent() {
 
                         <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-3xl bg-white/40">
                             <h2 className="text-2xl font-bold text-slate-800 tracking-tight text-center px-6 leading-tight">
-                                Haircut<br />in progress
+                                Service<br />in progress
                             </h2>
                         </div>
                     </div>

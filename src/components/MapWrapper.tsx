@@ -336,7 +336,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 [Math.min(userLocation.long, targetStore.long), Math.min(userLocation.lat, targetStore.lat)],
                 [Math.max(userLocation.long, targetStore.long), Math.max(userLocation.lat, targetStore.lat)]
             ];
-            const buffer = 0.005; // Slightly larger buffer
+            const buffer = 0.0003; // Ultra tight buffer (~30m)
             const expandedBounds = [
                 [bounds[0][0] - buffer, bounds[0][1] - buffer],
                 [bounds[1][0] + buffer, bounds[1][1] + buffer]
@@ -346,12 +346,17 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
             // Use flyTo for smoother transition if close, or fitBounds if far? 
             // Stick to fitBounds for consistency.
-            mapRef.current?.fitBounds(expandedBounds, {
-                padding: { top: 100, bottom: 250, left: 50, right: 50 }, // More bottom padding for Reveal Card
-                duration: 2000,
-                essential: true
-            });
+            // Delay slightly to let React render the UI changes (Reveal Card etc)
+            // and strictly avoid race conditions with viewState updates
+            setTimeout(() => {
+                mapRef.current?.fitBounds(expandedBounds, {
+                    padding: { top: 80, bottom: 220, left: 40, right: 40 },
+                    duration: 1500,
+                    essential: true
+                });
+            }, 50);
         }
+
 
         // Fetch a free slot for this org (Demo Logic)
         let slotId = null;

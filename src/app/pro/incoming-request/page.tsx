@@ -128,8 +128,8 @@ export default function IncomingRequestPage() {
             {/* Main Content Wrapper (Centered) */}
             <div className="w-full flex flex-col items-center justify-center space-y-4">
 
-                {/* Main Request Card (Reduced Height, Responsive) */}
-                <div className="w-full bg-slate-200/80 backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
+                {/* Main Request Card (Reduced Height, Responsive) - Unified Color (#E9E9EB) */}
+                <div className="w-full bg-[#E9E9EB] backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
                     <div className="text-center">
                         <h2 className="text-2xl font-semibold text-slate-900 leading-snug">
                             {requestData.serviceTitle}
@@ -142,7 +142,7 @@ export default function IncomingRequestPage() {
                     <div className="text-sm font-medium text-slate-800">
                         Estimated service - {requestData.duration}
                     </div>
-                    <div className="text-sm font-bold text-slate-900">
+                    <div className="text-sm font-normal text-slate-900">
                         Arrival in {requestData.eta}
                     </div>
                 </div>
@@ -168,7 +168,7 @@ export default function IncomingRequestPage() {
                 />
                 {/* Label */}
                 <div className="absolute inset-0 flex items-center justify-center gap-2 z-10">
-                    <span className="text-slate-500 font-medium text-base">Decline</span>
+                    <span className="text-slate-500 font-medium text-base">Decline?</span>
                 </div>
             </div>
         </div>

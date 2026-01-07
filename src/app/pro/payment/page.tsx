@@ -116,13 +116,20 @@ export default function PaymentPage() {
     return (
         <div className="flex flex-col h-full">
 
-            {/* Amount Display */}
-            <div className={`w-full aspect-video rounded-[32px] flex flex-col items-center justify-center p-6 text-center shadow-sm transition-colors duration-500 mb-8 ${status === 'rejected_retry' ? 'bg-red-50 border-2 border-red-200' : 'bg-white border-2 border-slate-100'}`}>
-                <span className="text-6xl font-black text-slate-800 tracking-tighter">
-                    {amount} <span className="text-4xl text-slate-400">€</span>
+            {/* Flexible Spacer to center Content */}
+            <div className="flex-1"></div>
+
+            {/* Amount Display - Minimal Height */}
+            <div className={`w-full py-6 rounded-[32px] flex items-center justify-center text-center shadow-sm transition-colors duration-500 mb-4 ${status === 'rejected_retry' ? 'bg-red-50 border-2 border-red-200' : 'bg-white border-2 border-slate-100'}`}>
+                <span className="text-4xl font-black text-slate-800 tracking-tighter">
+                    {amount} <span className="text-2xl text-slate-400">€</span>
                 </span>
-                <p className={`mt-2 font-medium h-6 ${status === 'rejected_retry' ? 'text-red-500 animate-pulse' : 'text-slate-400'}`}>
-                    {getFeedbackMessage()}
+            </div>
+
+            {/* Feedback Message */}
+            <div className="h-6 mb-8 flex items-center justify-center">
+                <p className={`font-medium ${status === 'rejected_retry' ? 'text-red-500 animate-pulse' : 'text-slate-400 opacity-0'}`}>
+                    {getFeedbackMessage() || "Placeholder"}
                 </p>
             </div>
 
@@ -157,7 +164,7 @@ export default function PaymentPage() {
                     </span>
                 ) : (
                     <span className="flex items-center gap-2">
-                        Confirm Amount <Check size={24} strokeWidth={3} />
+                        Confirm amount <Check size={24} strokeWidth={3} />
                     </span>
                 )}
             </Button>
