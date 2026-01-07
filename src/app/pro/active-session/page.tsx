@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function ActiveSessionPage() {
@@ -15,14 +14,38 @@ export default function ActiveSessionPage() {
     const supabase = createClient();
 
     // Simulation State
-    const [eta, setEta] = useState(12); // Start at 12 minutes
+    const [eta, setEta] = useState<number | null>(null); // Start null until fetched
     const [statusText, setStatusText] = useState("Client is on his way");
     const [isApproaching, setIsApproaching] = useState(false);
     const [isInProgress, setIsInProgress] = useState(false);
 
+    // Initial Fetch (Synchronize ETA)
+    useEffect(() => {
+        if (!sessionId) return;
+        const fetchSession = async () => {
+            const { data } = await supabase
+                .from('sessions')
+                .select('estimated_arrival_duration, state')
+                .eq('id', sessionId)
+                .single();
+
+            if (data?.estimated_arrival_duration) {
+                // Set initial ETA from the real DB value
+                setEta(data.estimated_arrival_duration);
+            } else {
+                setEta(12); // Fallback
+            }
+
+            if (data?.state === 'in_progress') {
+                setIsInProgress(true);
+            }
+        };
+        fetchSession();
+    }, [sessionId]);
+
     const handleStartService = async () => {
         if (!sessionId) return;
-        console.log("Triggering Service Start (Gap)...");
+        console.log("Triggering Service Start...");
         setIsInProgress(true); // Optimistic
 
         const { error } = await supabase.rpc('api_v1_start_service', {
@@ -36,62 +59,75 @@ export default function ActiveSessionPage() {
 
     const handleCompletion = async () => {
         if (!sessionId) return;
-        console.log("Triggering Completion...");
 
         const { data, error } = await supabase.rpc('api_v1_complete_session', {
             p_session_id: sessionId
         });
 
         if (error) {
-            console.error("Completion Network/Server Error:", error);
             alert("Error: " + error.message);
         } else if (data && !data.success) {
-            console.error("Completion Logic Error:", data.error);
             alert("Completion Failed: " + data.error);
         } else {
             router.push(`/pro/completion?session_id=${sessionId}`);
         }
     };
 
-    useEffect(() => {
-        if (isInProgress) return; // Stop timer logic if in progress
+    // Stable Interval to prevent "Zeno's Paradox" (slowing down as minutes decrease)
+    const intervalRef = useRef<number | null>(null);
+    const phaseRef = useRef<'P3' | 'P4'>('P3');
 
-        // Accelerate time for Demo: 1 real sec = 1 simulated minute (approx)
+    useEffect(() => {
+        if (isInProgress || eta === null || eta <= 0) return;
+
+        // Determine critical interval ONLY if not set or if phase changes
+        let currentPhase: 'P3' | 'P4' = eta > 5 ? 'P3' : 'P4';
+
+        // Reset interval if phase changed
+        if (currentPhase !== phaseRef.current) {
+            intervalRef.current = null;
+            phaseRef.current = currentPhase;
+        }
+
+        if (!intervalRef.current) {
+            if (currentPhase === 'P3') {
+                // P3 Travel: 20 seconds to cover (InitialETA - 5) minutes
+                // We calculate the tick ONCE based on the gap at that moment.
+                const P3_DURATION_MS = 20000;
+                const minutesToCover = eta - 5;
+                intervalRef.current = P3_DURATION_MS / Math.max(1, minutesToCover);
+            } else {
+                // P4 Approach: 10 seconds to cover remaining minutes (e.g. 5)
+                const P4_DURATION_MS = 10000;
+                intervalRef.current = P4_DURATION_MS / Math.max(1, eta);
+            }
+        }
+
         const timer = setInterval(() => {
             setEta((prev) => {
-                const newEta = Math.max(0, prev - 1); // Decrease by 1 min every tick
+                if (prev === null) return null;
+                const newEta = Math.max(0, prev - 1); // Decrease by 1 min
 
-                // State Transition P3 -> P4
                 if (newEta <= 5 && newEta > 0 && !isApproaching) {
                     setIsApproaching(true);
                     setStatusText("Client approaching");
+                    // Force re-calc for next tick naturally via effect dependency?
+                    // Actually, the effect will re-run when `eta` changes.
+                    // But we want to preserve intervalRef unless phase changes.
                 }
-                // State Transition P4 -> P5 (Auto-Trigger)
                 else if (newEta === 0) {
                     handleStartService();
                     clearInterval(timer);
                 }
-
                 return newEta;
             });
-        }, 3000); // 3 seconds = 1 minute
+        }, intervalRef.current);
 
         return () => clearInterval(timer);
-    }, [isApproaching, isInProgress]);
-
-    const handleSettings = () => {
-        router.push("/pro");
-    };
+    }, [isApproaching, isInProgress, eta]);
 
     return (
         <div className="flex flex-col w-full h-full relative">
-            {sessionId && (
-                <div className="absolute top-0 right-0 z-20 p-2 opacity-50 hover:opacity-100 transition-opacity">
-                    <div className="text-[10px] bg-slate-200 text-slate-500 px-2 py-1 rounded font-mono">
-                        ID: {sessionId.slice(0, 8)}...
-                    </div>
-                </div>
-            )}
 
             {/* Mesh Background */}
             <div className="absolute inset-0 z-0 opacity-30 pointer-events-none">
@@ -99,7 +135,7 @@ export default function ActiveSessionPage() {
                 <div className="absolute top-1/4 right-0 w-64 h-64 bg-purple-50 rounded-full blur-[80px]" />
             </div>
 
-            <div className="flex-1 flex flex-col px-6 pt-8 pb-32 z-10 w-full">
+            <div className="flex-1 flex flex-col px-6 pt-8 pb-32 z-10 w-full justify-center">
                 {/* Status Box - P3/P4/P5 */}
                 {isInProgress ? (
                     <div className="w-full flex-1 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -114,7 +150,7 @@ export default function ActiveSessionPage() {
 
                         <div className="text-center mb-8">
                             <h2 className="text-3xl font-black text-slate-800 leading-tight mb-2">
-                                Haircut in progress
+                                In Progress
                             </h2>
                             <p className="text-slate-400 font-medium">Focus on the client.</p>
                         </div>
@@ -128,11 +164,9 @@ export default function ActiveSessionPage() {
                         </Button>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col justify-between">
-                        <div className="mt-8">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[11px] font-bold uppercase tracking-wider mb-4 border border-blue-100/50">
-                                {isApproaching ? "Arrival Imminent" : "On the way"}
-                            </div>
+                    <div className="flex-1 flex flex-col justify-center items-center gap-12">
+
+                        <div className="text-center">
                             <h2 className="text-4xl font-black text-slate-900 leading-[1.1] tracking-tight">
                                 {statusText}
                             </h2>
@@ -140,32 +174,15 @@ export default function ActiveSessionPage() {
 
                         <div
                             onClick={() => handleStartService()} // Dev Trigger
-                            className="flex-1 flex flex-col items-center justify-center cursor-pointer group"
+                            className="flex flex-col items-center justify-center cursor-pointer group"
                         >
                             <div className={`text-[120px] leading-none font-black tracking-tighter transition-all duration-500 ${isApproaching ? "text-slate-900 scale-110" : "text-slate-200"}`}>
                                 {eta}<span className="text-4xl align-top ml-2 text-slate-300 font-bold">min</span>
                             </div>
                             <p className="text-sm font-bold text-slate-400 mt-4 uppercase tracking-widest group-hover:text-blue-500 transition-colors">
-                                {isApproaching ? "Tap to Start Service" : "Estimated Arrival"}
+                                Estimated arrival
                             </p>
                         </div>
-
-                        {sessionId && (
-                            <div className="w-full bg-white/60 backdrop-blur-md rounded-2xl p-4 border border-whiteShadow-sm">
-                                <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-slate-200" />
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900">Client Name</span>
-                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Basic Haircut</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-sm font-bold text-slate-900">30€</div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

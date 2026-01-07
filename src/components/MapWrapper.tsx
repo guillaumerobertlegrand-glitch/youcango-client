@@ -325,7 +325,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
         console.log("LOCKING on store:", targetStore);
         setIsLocking(true);
-        setSelectedStore(targetStore); // FIX: Ensure selectedStore is set for filtering
+        setSelectedStore(targetStore);
+        onStoreSelected?.(targetStore); // FIX: Notify parent (ClientHome) for Reveal Card
         onLockingChange?.(true);
         onLockProgress?.(100);
 
@@ -335,15 +336,19 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 [Math.min(userLocation.long, targetStore.long), Math.min(userLocation.lat, targetStore.lat)],
                 [Math.max(userLocation.long, targetStore.long), Math.max(userLocation.lat, targetStore.lat)]
             ];
-            const buffer = 0.002; // Tighter zoom for locking
+            const buffer = 0.005; // Slightly larger buffer
             const expandedBounds = [
                 [bounds[0][0] - buffer, bounds[0][1] - buffer],
                 [bounds[1][0] + buffer, bounds[1][1] + buffer]
             ] as [mapboxgl.LngLatLike, mapboxgl.LngLatLike];
 
-            mapRef.current.fitBounds(expandedBounds, {
-                padding: { top: 50, bottom: 50, left: 50, right: 50 },
-                duration: 1500,
+            console.log("Zooming to bounds:", expandedBounds);
+
+            // Use flyTo for smoother transition if close, or fitBounds if far? 
+            // Stick to fitBounds for consistency.
+            mapRef.current?.fitBounds(expandedBounds, {
+                padding: { top: 100, bottom: 250, left: 50, right: 50 }, // More bottom padding for Reveal Card
+                duration: 2000,
                 essential: true
             });
         }
@@ -412,12 +417,35 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             serviceRequested = serviceRequested.charAt(0).toUpperCase() + serviceRequested.slice(1);
         }
 
+        // --- NEW: Calculate Real ETA (Truth on Ground) ---
+        let estimatedDuration = 15; // default fallback
+        if (MAPBOX_TOKEN && userLocation && targetStore) {
+            try {
+                const start = [userLocation.long, userLocation.lat];
+                const end = [targetStore.long, targetStore.lat];
+                console.log("[MapWrapper] Calculating Real ETA before session creation...");
+
+                // Fetch Mapbox Directions directly
+                const query = await fetch(`https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?steps=true&geometries=geojson&access_token=${MAPBOX_TOKEN}`);
+                const json = await query.json();
+
+                if (json.routes && json.routes[0]) {
+                    const durationSec = json.routes[0].duration;
+                    estimatedDuration = Math.ceil(durationSec / 60); // Convert to minutes
+                    console.log("[MapWrapper] Calculated ETA:", estimatedDuration, "min");
+                }
+            } catch (err) {
+                console.error("Error calculating ETA:", err);
+            }
+        }
+
         const { data, error } = await supabase.rpc('api_v1_create_session', {
             p_location_id: targetStore.location_id,
             p_monetization_model: targetStore.business_type === 'service' ? 'commission' : 'subscription',
             p_arrival_timing_minutes: arrivalTiming,
             p_slot_id: slotId,
-            p_service_requested: serviceRequested // Dynamic Service Name
+            p_service_requested: serviceRequested, // Dynamic Service Name
+            p_estimated_arrival_duration: estimatedDuration // <--- REAL MAPBOX DATA
         });
 
         if (error) {
@@ -514,8 +542,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         // Ideally we project current userLocation to path, but for demo, starting at 0 is fine if user is at start.
 
         const speedFactor = 5; // Skip points to speed up (adjust based on path density)
-        // Target 45 seconds to cover the path (matching Pro P3/P4 flow)
-        const TARGET_DURATION_MS = 45000;
+        // Target 30 seconds to cover the path (matching Pro P3+P4 duration)
+        const TARGET_DURATION_MS = 30000;
         const tickInterval = Math.max(50, TARGET_DURATION_MS / coords.length);
 
         const simulationInterval = setInterval(() => {

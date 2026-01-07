@@ -199,31 +199,32 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                             {/* Avatar (Pro Photo) */}
                                             <div className="h-16 w-16 rounded-full bg-slate-200 shadow-sm border-2 border-white relative overflow-hidden flex-shrink-0">
                                                 <img
-                                                    src="/avatars/barber-mike.jpg"
+                                                    src="/avatars/barber-mike.jpg" // Keep avatar for demo visual, or fetch if available
                                                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                    alt="Mike"
+                                                    alt={selectedStore?.name || "Provider"}
                                                     className="w-full h-full object-cover"
                                                 />
                                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center text-slate-400 font-bold text-xl -z-10">
-                                                    M
+                                                    {(selectedStore?.name?.[0] || "P").toUpperCase()}
                                                 </div>
                                             </div>
 
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-2">
                                                     <h3 className="text-[18px] font-bold text-slate-900 leading-tight tracking-tight capitalize">
-                                                        {selectedStore?.name || 'Dandy Barber'}
+                                                        {selectedStore?.name || 'Selected Provider'}
                                                     </h3>
                                                 </div>
                                                 <div className="flex flex-col gap-0.5 mt-0.5">
-                                                    <span className="text-[14px] text-slate-600 font-semibold leading-snug">
-                                                        Mike
+                                                    <span className="text-[14px] text-slate-600 font-semibold leading-snug capitalize">
+                                                        {/* Role/Category or specific name if available */}
+                                                        {(selectedStore?.category || selectedStore?.business_type || 'Professional').replace('_', ' ')}
                                                     </span>
                                                     <span className="text-[13px] text-slate-400 font-medium leading-snug">
-                                                        {selectedStore?.address || '12 Rue de Rivoli, 75001 Paris'}
+                                                        {selectedStore?.address || 'Location Details'}
                                                     </span>
                                                     <span className="text-[13px] text-blue-600 font-medium mt-1">
-                                                        01 42 33 44 55
+                                                        01 00 00 00 00
                                                     </span>
                                                 </div>
                                             </div>

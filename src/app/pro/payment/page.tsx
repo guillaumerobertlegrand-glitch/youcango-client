@@ -114,64 +114,54 @@ export default function PaymentPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative overflow-hidden">
-            {/* Header */}
-            <header className="px-6 py-6 flex items-center justify-between z-10">
-                <h1 className="text-2xl font-black tracking-tight">YouCanGo</h1>
-                <Button variant="ghost" size="icon" className="text-slate-900">
-                    <Settings size={24} />
-                </Button>
-            </header>
+        <div className="flex flex-col h-full">
 
-            <main className="flex-1 flex flex-col px-6 pt-4 pb-6 w-full max-w-md mx-auto">
+            {/* Amount Display */}
+            <div className={`w-full aspect-video rounded-[32px] flex flex-col items-center justify-center p-6 text-center shadow-sm transition-colors duration-500 mb-8 ${status === 'rejected_retry' ? 'bg-red-50 border-2 border-red-200' : 'bg-white border-2 border-slate-100'}`}>
+                <span className="text-6xl font-black text-slate-800 tracking-tighter">
+                    {amount} <span className="text-4xl text-slate-400">€</span>
+                </span>
+                <p className={`mt-2 font-medium h-6 ${status === 'rejected_retry' ? 'text-red-500 animate-pulse' : 'text-slate-400'}`}>
+                    {getFeedbackMessage()}
+                </p>
+            </div>
 
-                {/* Amount Display */}
-                <div className={`w-full aspect-video rounded-[32px] flex flex-col items-center justify-center p-6 text-center shadow-sm transition-colors duration-500 mb-8 ${status === 'rejected_retry' ? 'bg-red-50 border-2 border-red-200' : 'bg-white border-2 border-slate-100'}`}>
-                    <span className="text-6xl font-black text-slate-800 tracking-tighter">
-                        {amount} <span className="text-4xl text-slate-400">€</span>
-                    </span>
-                    <p className={`mt-2 font-medium h-6 ${status === 'rejected_retry' ? 'text-red-500 animate-pulse' : 'text-slate-400'}`}>
-                        {getFeedbackMessage()}
-                    </p>
-                </div>
-
-                {/* Keypad */}
-                <div className="flex-1 grid grid-cols-3 gap-4 mb-4">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                        <button
-                            key={num}
-                            onClick={() => handleDigit(num.toString())}
-                            className="text-3xl font-bold text-slate-700 bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center aspect-square"
-                        >
-                            {num}
-                        </button>
-                    ))}
-                    <button onClick={handleComma} className="text-3xl font-bold text-slate-700 bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center aspect-square">,</button>
-                    <button onClick={() => handleDigit("0")} className="text-3xl font-bold text-slate-700 bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center aspect-square">0</button>
-                    <button onClick={handleBackspace} className="text-slate-700 bg-white rounded-2xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center aspect-square">
-                        <Delete size={32} />
+            {/* Keypad - Reduced Height, Full Width */}
+            <div className="flex-1 grid grid-cols-3 gap-3 mb-4 content-center w-full">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <button
+                        key={num}
+                        onClick={() => handleDigit(num.toString())}
+                        className="text-2xl font-bold text-slate-700 bg-white rounded-xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center h-14"
+                    >
+                        {num}
                     </button>
-                </div>
+                ))}
+                <button onClick={handleComma} className="text-2xl font-bold text-slate-700 bg-white rounded-xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center h-14">,</button>
+                <button onClick={() => handleDigit("0")} className="text-2xl font-bold text-slate-700 bg-white rounded-xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center h-14">0</button>
+                <button onClick={handleBackspace} className="text-slate-700 bg-white rounded-xl shadow-sm hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center h-14">
+                    <Delete size={24} />
+                </button>
+            </div>
 
-                {/* Validate Button */}
-                <Button
-                    className={`w-full h-16 text-xl font-bold rounded-full transition-all duration-300 ${status === 'processing' ? 'bg-slate-300' : 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200'}`}
-                    onClick={handlePropose}
-                    disabled={status === 'processing' || amount === "0"}
-                >
-                    {status === 'processing' ? (
-                        <span className="flex items-center gap-2">
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Waiting...
-                        </span>
-                    ) : (
-                        <span className="flex items-center gap-2">
-                            Confirm Amount <Check size={24} strokeWidth={3} />
-                        </span>
-                    )}
-                </Button>
+            {/* Validate Button */}
+            <Button
+                className={`w-full h-16 text-xl font-bold rounded-full transition-all duration-300 ${status === 'processing' ? 'bg-slate-300' : 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200'}`}
+                onClick={handlePropose}
+                disabled={status === 'processing' || amount === "0"}
+            >
+                {status === 'processing' ? (
+                    <span className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Waiting...
+                    </span>
+                ) : (
+                    <span className="flex items-center gap-2">
+                        Confirm Amount <Check size={24} strokeWidth={3} />
+                    </span>
+                )}
+            </Button>
 
-            </main>
         </div>
     );
 }

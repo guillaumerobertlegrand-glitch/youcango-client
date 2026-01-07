@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
-// Mock Data for the Request
-const REQUEST_DATA = {
+// Mock Data for the Request (Fallback)
+const DEFAULT_REQUEST = {
     customerStatus: "Customer is ready",
-    serviceTitle: "Haircut requested",
-    serviceType: "Haircut",
+    serviceTitle: "Service requested",
+    serviceType: "Service",
     duration: "30 min",
     eta: "12 min"
 };
@@ -24,6 +24,34 @@ export default function IncomingRequestPage() {
     const sessionId = searchParams.get('session_id');
     const supabase = createClient();
     const [progress, setProgress] = useState(100);
+    const [requestData, setRequestData] = useState(DEFAULT_REQUEST);
+
+    // Fetch Session Details
+    useEffect(() => {
+        if (!sessionId) return;
+
+        const fetchSession = async () => {
+            const { data, error } = await supabase
+                .from('sessions')
+                .select('service_requested, estimated_arrival_duration')
+                .eq('id', sessionId)
+                .single();
+
+            if (data?.service_requested) {
+                // Use DB Duration or fallback to "Unknown"
+                const realDuration = data.estimated_arrival_duration ? `${data.estimated_arrival_duration} min` : "12 min";
+
+                setRequestData(prev => ({
+                    ...prev,
+                    serviceTitle: data.service_requested, // No more "requested" suffix
+                    serviceType: data.service_requested,
+                    eta: realDuration // Update ETA with real duration
+                }));
+            }
+        };
+
+        fetchSession();
+    }, [sessionId]);
 
     // Timer Logic - Updates progress regularly for smooth animation
     useEffect(() => {
@@ -92,46 +120,55 @@ export default function IncomingRequestPage() {
     };
 
     return (
-        <div className="flex flex-col h-full w-full">
-            {/* Chat Bubble Pill (Left Aligned) */}
-            <div className="self-start bg-slate-200 rounded-2xl rounded-tl-none px-6 py-3 mb-8 shadow-sm animate-in fade-in slide-in-from-left duration-500">
-                <span className="font-bold text-slate-700 text-sm">
-                    {REQUEST_DATA.customerStatus}
+        <div className="flex flex-col h-full w-full px-4">
+
+            {/* Top Spacer */}
+            <div className="flex-1" />
+
+            {/* Main Content Wrapper (Centered) */}
+            <div className="w-full flex flex-col items-center justify-center space-y-4">
+
+                {/* Main Request Card (Reduced Height, Responsive) */}
+                <div className="w-full bg-slate-200/80 backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
+                    <div className="text-center">
+                        <h2 className="text-2xl font-semibold text-slate-900 leading-snug">
+                            {requestData.serviceTitle}
+                        </h2>
+                    </div>
+                </div>
+
+                {/* Details (Restored ETA) */}
+                <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2">
+                    <div className="text-sm font-medium text-slate-800">
+                        Estimated service - {requestData.duration}
+                    </div>
+                    <div className="text-sm font-bold text-slate-900">
+                        Arrival in {requestData.eta}
+                    </div>
+                </div>
+
+            </div>
+
+            {/* Bottom Spacer */}
+            <div className="flex-1" />
+
+            {/* SMS Bubble Pill (Bottom Left) */}
+            <div className="self-start bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 mb-6 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[85%]">
+                <span className="font-normal text-slate-900 text-[15px] leading-snug">
+                    {requestData.customerStatus}
                 </span>
             </div>
 
-            {/* Main Request Card */}
-            <Card className="w-full bg-slate-800 border-0 shadow-2xl rounded-[32px] overflow-hidden mb-6 aspect-[4/3] flex items-center justify-center relative group animate-in zoom-in-95 duration-500">
-                <div className="text-center p-6">
-                    <h2 className="text-3xl font-black text-white leading-tight underline decoration-blue-500 decoration-4 underline-offset-8">
-                        {REQUEST_DATA.serviceTitle}
-                    </h2>
-                </div>
-            </Card>
-
-            {/* Details */}
-            <div className="w-full space-y-2 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200">
-                <div className="text-xl font-bold text-slate-900">
-                    {REQUEST_DATA.serviceType} - {REQUEST_DATA.duration}
-                </div>
-                <div className="text-lg font-medium text-slate-500">
-                    Expected arrival - {REQUEST_DATA.eta}
-                </div>
-            </div>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
             {/* Decline Button with Unfilling Progress */}
-            <div className="w-full relative h-16 rounded-[20px] overflow-hidden shadow-sm border border-slate-300 bg-slate-100 cursor-pointer active:scale-95 transition-all" onClick={handleDecline}>
+            <div className="w-full relative h-14 rounded-[16px] overflow-hidden shadow-sm border border-slate-200 bg-white cursor-pointer active:scale-95 transition-all mb-2" onClick={handleDecline}>
                 {/* Progress Bar Background */}
                 <div
-                    className="absolute left-0 top-0 bottom-0 bg-slate-300/50 transition-all duration-100 ease-linear"
+                    className="absolute left-0 top-0 bottom-0 bg-slate-100 transition-all duration-100 ease-linear"
                     style={{ width: `${progress}%` }}
                 />
                 {/* Label */}
                 <div className="absolute inset-0 flex items-center justify-center gap-2 z-10">
-                    <span className="text-slate-600 font-bold text-lg">Decline?</span>
+                    <span className="text-slate-500 font-medium text-base">Decline</span>
                 </div>
             </div>
         </div>
