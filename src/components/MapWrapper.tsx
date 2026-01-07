@@ -31,6 +31,7 @@ interface MapWrapperProps {
         keywords: string[];
         primary_business_type: string;
         extracted_category?: string;
+        intent_summary?: string; // Added intent_summary
     } | null;
     onLoadingChange?: (loading: boolean) => void;
     onGuidanceStateChange?: (guiding: boolean) => void;
@@ -158,16 +159,42 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
             try {
                 const viewerId = getOrCreateAnonymousId();
-                // Combine keywords and category for broader search
+                // Combine keywords, category, AND extracted_category for broader search
                 const searchKeywords = [...(intentData.keywords || [])];
+
+                // Add the high-level type (e.g. 'service') if not present
                 if (intentData.category && !searchKeywords.includes(intentData.category)) {
                     searchKeywords.push(intentData.category);
                 }
 
+                // CRITICAL: Add the specific extracted type (e.g. 'restaurant') 
+                // This ensures "Table for 2" (kw='table') matches DB Category 'restaurant'
+                if (intentData.extracted_category && !searchKeywords.includes(intentData.extracted_category)) {
+                    searchKeywords.push(intentData.extracted_category);
+                }
+
+                // Correct Category -> Business Type Mapping (Client-side Override)
+                // "Table for 2" (AI says 'service') -> DB needs 'merchant' for Restaurant
+                const getBusinessType = (cat: string | undefined, extracted: string | undefined): string | null => {
+                    const lowerExtracted = (extracted || '').toLowerCase();
+                    const lowerCat = (cat || '').toLowerCase();
+
+                    // Explicit Mappings (Align with DB)
+                    if (['restaurant', 'bakery', 'grocery', 'florist', 'bookstore', 'mechanic', 'electronics'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
+                        return 'merchant';
+                    }
+                    if (['hairdresser', 'barber', 'beauty_salon', 'doctor', 'plumber', 'taxi'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
+                        return 'service';
+                    }
+                    return cat || null; // Fallback to what AI said
+                };
+
+                const refinedBusinessType = getBusinessType(intentData.category, intentData.extracted_category);
+
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
-                    p_category: intentData.category,
+                    p_category: refinedBusinessType, // Use refined type
                     p_keywords: searchKeywords,
                     p_radius_meters: 5000,
                     p_viewer_id: viewerId // Pass identity for Cooldown filtering
@@ -335,11 +362,62 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             slotId = slots[0].id;
         }
 
+        // Helper to map technical Categories to nice Intent Labels
+        const getServiceName = (category: string | undefined, businessType: 'service' | 'merchant') => {
+            const raw = (category || businessType).toLowerCase();
+
+            const MAPPINGS: Record<string, string> = {
+                // Beauty / Hair
+                'hairdresser': 'Haircut',
+                'barber': 'Haircut',
+                'beauty_salon': 'Beauty Care',
+                'massage': 'Massage',
+
+                // Food / Restaurant
+                'restaurant': 'Table for 2',
+                'bakery': 'Bakery Order',
+                'cafe': 'Coffee',
+                'bar': 'Drinks',
+
+                // Auto / Repair
+                'mechanic': 'Oil Change',
+                'garage': 'Car Repair',
+                'electronics': 'Device Repair',
+
+                // Generic Fallbacks
+                'merchant': 'Purchase',
+                'service': 'Service'
+            };
+
+            // Try exact match
+            if (MAPPINGS[raw]) return MAPPINGS[raw];
+
+            // Try partial match
+            if (raw.includes('hair') || raw.includes('coiff')) return 'Haircut';
+            if (raw.includes('food') || raw.includes('restau')) return 'Table for 2';
+            if (raw.includes('car') || raw.includes('auto')) return 'Oil Change';
+
+            // Formatting fallback (Capitalize)
+            return raw.charAt(0).toUpperCase() + raw.slice(1);
+        };
+
+        // PRIORITIZE Intent Summary (User's words) if available
+        let serviceRequested = intentData?.intent_summary;
+
+        // If not, try to construct one from Category or Mappings
+        if (!serviceRequested) {
+            serviceRequested = getServiceName(intentData?.category || targetStore.category, targetStore.business_type);
+        } else {
+            // Polish the summary (Capitalize first letter)
+            serviceRequested = serviceRequested.charAt(0).toUpperCase() + serviceRequested.slice(1);
+        }
+
         const { data, error } = await supabase.rpc('api_v1_create_session', {
             p_location_id: targetStore.location_id,
             p_monetization_model: targetStore.business_type === 'service' ? 'commission' : 'subscription',
             p_arrival_timing_minutes: arrivalTiming,
-            p_slot_id: slotId
+            p_slot_id: slotId,
+            p_service_requested: serviceRequested // Dynamic Service Name
         });
 
         if (error) {

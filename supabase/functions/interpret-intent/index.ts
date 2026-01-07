@@ -39,8 +39,8 @@ serve(async (req) => {
             }
 
             Règles :
-            - Si le besoin concerne une personne ou un service pro (coiffeur, médecin, plombier), la catégorie est 'service'.
-            - Si le besoin concerne un achat de produit physique (pain, fleurs, vêtements), la catégorie est 'merchant'.
+            - Si le besoin concerne une mise à disposition de temps ou d'espace (coiffeur, restaurant/table, médecin, garage), la catégorie est 'service'.
+            - Si le besoin concerne un achat de produit physique à emporter (boulangerie, fleurs, vêtements), la catégorie est 'merchant'.
             - IMPORTANT : Traduis TOUJOURS les 'keywords' en Anglais (ex: 'coiffeur' -> 'barber', 'haircut'). La recherche database se fait en anglais.
             - Réponds UNIQUEMENT with le JSON, sans explications.`
 
