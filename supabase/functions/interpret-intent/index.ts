@@ -29,26 +29,16 @@ serve(async (req) => {
             - "grocery" (courses, supermarché, alimentation)
             - "electronics" (réparation, téléphone, informatique)
 
-            Analyse temporelle :
-            - Si l'utilisateur utilise des termes comme "ce soir", "demain", "mardi prochain", "à 20h", c'est un besoin différé.
-            - Si l'utilisateur dit "maintenant", "tout de suite" ou ne précise rien, c'est un besoin immédiat.
-
-            Format attendu :
-            {
-                "category": "service" | "merchant",
-                "extracted_category": "une des catégories autorisées ci-dessus",
-                "keywords": ["english_term1", "english_term2"],
-                "intent_summary": "résumé court inclus le moment si précisé",
-                "primary_business_type": "type spécifique",
-                "intent_mode": "immediacy" | "delayed",
-                "scheduled_at": "ISO_DATE_STRING" | null
-            }
-
+            Analyse temporelle et Mode :
+            - "merchant" (achat produit) : PEUT être "delayed" (différé) si une heure future est précisée.
+            - "service" (prestation temps/espace) : DOIT TOUJOURS être "immediacy" (immédiat), même si l'utilisateur mentionne le futur.
+            
             Règles :
             - Si le besoin concerne une mise à disposition de temps ou d'espace (coiffeur, restaurant/table, médecin, garage), la catégorie est 'service'.
-            - Si le besoin concerne un achat de produit physique à emporter (boulangerie, fleurs, vêtements), la catégorie est 'merchant'.
+            - Si le besoin concerne un achat de produit physique à emporter (boulangerie, fleurs, vêtements, gâteau), la catégorie est 'merchant'.
             - IMPORTANT : Traduis TOUJOURS les 'keywords' en Anglais (ex: 'coiffeur' -> 'barber', 'haircut'). La recherche database se fait en anglais.
-            - Pour "scheduled_at", convertis l'expression temporelle relative (ex: "ce soir") en une date future approximative ISO 8601. Nous sommes le ${new Date().toISOString()}.
+            - Pour "merchant" SEULEMENT : Si une date future est donnée, intent_mode="delayed" et remplis "scheduled_at".
+            - Pour "service" : Force TOUJOURS intent_mode="immediacy". Si l'utilisateur a demandé une date future, ajoute "(Note: Service is Real-Time Only)" dans le intent_summary.
             - Réponds UNIQUEMENT with le JSON, sans explications.`
 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`

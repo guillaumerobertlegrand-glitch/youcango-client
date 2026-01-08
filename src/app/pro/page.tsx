@@ -108,7 +108,7 @@ export default function ProDashboard() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700">
+        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700 bg-white">
 
             {/* Status Text (Simplified) */}
             <h2 className={`text-3xl font-bold tracking-tight transition-colors duration-300 text-center ${isOnline ? 'text-green-600' : 'text-slate-400'}`}>

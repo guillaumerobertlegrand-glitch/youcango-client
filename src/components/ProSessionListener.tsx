@@ -28,9 +28,15 @@ export default function ProSessionListener() {
                     const state = payload.new?.state;
                     const id = payload.new?.id;
 
-                    if (id && (state === 'locking' || state === 'pending')) {
-                        console.log(`[ProSessionListener] Triggering Request for session ${id}`);
-                        router.push(`/pro/incoming-request?session_id=${id}`);
+                    if (id && state === 'locking') {
+                        // FIX: Only redirect on NEW requests (locking).
+                        // 'pending' means it was accepted, so we stay on ActiveSessionPage (P3).
+                        console.log(`[ProSessionListener] New Request (locking) for session ${id}`);
+
+                        // Avoid loop if already there
+                        if (!window.location.href.includes(`incoming-request?session_id=${id}`)) {
+                            router.push(`/pro/incoming-request?session_id=${id}`);
+                        }
                     }
                 }
             )

@@ -18,7 +18,7 @@ export default function ProLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <main className={`flex flex-col h-screen bg-slate-50 max-w-md mx-auto relative font-sans ${inter.className}`}>
+        <main className={`flex flex-col h-screen bg-white max-w-md mx-auto relative font-sans ${inter.className}`}>
             <ProSessionListener />
 
             {/* Pro Header (Flex Item - Stays at top) */}
@@ -36,7 +36,7 @@ export default function ProLayout({
             </header>
 
             {/* Scrollable Content (Fills remaining space) */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6 hide-scrollbar relative">
+            <div className="flex-1 flex flex-col overflow-y-auto px-4 pb-6 hide-scrollbar relative">
                 {children}
             </div>
         </main>

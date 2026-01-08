@@ -50,7 +50,7 @@ interface MapWrapperProps {
 const DEMO_CONFIG = {
     'immediacy_service': { lat: 48.8566, long: 2.3522 }, // Paris Center
     'delayed_client': { lat: 45.7772, long: 3.0870 },    // Clermont-Ferrand
-    'delayed_rennes': { lat: 48.1173, long: -1.6778 },   // Rennes
+    'delayed_rennes': { lat: 48.1173, long: -1.6778 },   // Rennes (Merchant Demo)
     'pro_service': { lat: 48.8566, long: 2.3522 },       // Same as Client
     'pro_merchant': { lat: 48.8566, long: 2.3522 },      // Same as Client
     'parallel': { lat: 48.8566, long: 2.3522 }           // Same as Client
@@ -269,6 +269,9 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
     // 3. Dynamic Zoom & Centering logic
     useEffect(() => {
+        // STOP auto-zoom if we are locked or guiding (simulation handles view)
+        if (isLocking || isRevealed) return;
+
         if (stores.length === 0 || !userLocation || !mapRef.current) return;
 
         const currentStoresId = stores.map(s => s.id).join(',');
@@ -401,11 +404,11 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             // and strictly avoid race conditions with viewState updates
             setTimeout(() => {
                 mapRef.current?.fitBounds(expandedBounds, {
-                    padding: { top: 80, bottom: 220, left: 40, right: 40 },
+                    padding: { top: 50, bottom: 220, left: 20, right: 20 },
                     duration: 1500,
                     essential: true
                 });
-            }, 50);
+            }, 200);
         }
 
 
@@ -495,6 +498,16 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             }
         }
 
+        // --- POLICY ENFORCEMENT: Services are ALWAYS Immediacy ---
+        let finalIntentMode = intentData?.intent_mode || 'immediacy';
+        let finalScheduledAt = intentData?.scheduled_at || null;
+
+        if (targetStore.business_type === 'service' && finalIntentMode === 'delayed') {
+            console.warn("[MapWrapper] Policy Enforcement: Forcing 'immediacy' for Service request.");
+            finalIntentMode = 'immediacy';
+            finalScheduledAt = null; // Clear scheduled time
+        }
+
         const { data, error } = await supabase.rpc('api_v1_create_session', {
             p_location_id: targetStore.location_id,
             p_monetization_model: targetStore.business_type === 'service' ? 'commission' : 'subscription',
@@ -502,8 +515,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             p_slot_id: slotId,
             p_service_requested: serviceRequested, // Dynamic Service Name
             p_estimated_arrival_duration: estimatedDuration, // <--- REAL MAPBOX DATA
-            p_scheduled_at: intentData?.scheduled_at || null, // Pass Scheduled Time
-            p_intent_mode: intentData?.intent_mode || 'immediacy' // Pass Mode
+            p_scheduled_at: finalScheduledAt, // Enforced Policy
+            p_intent_mode: finalIntentMode // Enforced Policy
         });
 
         if (error) {
@@ -631,14 +644,23 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             const progress = (currentIndex / coords.length) * 100;
             onSimulationProgress?.(progress);
 
-            // Update Estimated Time (decreasing)
-            const remainingSteps = coords.length - currentIndex;
-            const remainingTimeSec = (remainingSteps * tickInterval) / 1000;
-            const remainingMinutes = Math.ceil(remainingTimeSec / 60);
+            // Update Estimated Time (decreasing) - SCALED TO REAL WORLD TIME
+            // If we started with say 15 mins (routeInfo.duration), and we are at 50%, we should show 7.5 mins.
+            // Not the simulation time left.
+            if (activeSessionRef.current?.estimated_arrival_duration) {
+                // Use the INITIAL DB value as the anchor if possible, or fallback.
+                // Ideally we should snap valid start duration.
+            }
+
+            // Allow getting initialDuration from the closure or ref.
+            // Fallback to routeInfo.duration (seconds)
+            const initialDurationSec = routeInfo?.duration || (15 * 60);
+            const remainingRealSec = initialDurationSec * (1 - (currentIndex / coords.length));
+            const remainingMinutes = Math.ceil(remainingRealSec / 60);
 
             // Only update if changed
             if (routeInfo && remainingMinutes !== Math.ceil(routeInfo.duration / 60)) {
-                onRouteInfoUpdate?.({ ...routeInfo, duration: remainingTimeSec });
+                onRouteInfoUpdate?.({ ...routeInfo, duration: remainingRealSec });
             }
 
             // --- SYNC TO DB FOR PRO VIEW (Throttled) ---

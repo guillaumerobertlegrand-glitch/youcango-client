@@ -233,7 +233,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                         {/* ETA */}
                                         <div className="text-right flex-shrink-0">
                                             <div className="text-2xl font-black text-slate-900 tracking-tighter">
-                                                {Math.max(1, Math.ceil((routeInfo?.duration ? (routeInfo.duration / 60) : 12) * (1 - simProgress)))}
+                                                {Math.max(1, Math.ceil((routeInfo?.duration ? (routeInfo.duration / 60) : 12)))}
                                                 <span className="text-sm font-bold text-slate-400 ml-1">min</span>
                                             </div>
                                         </div>

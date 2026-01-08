@@ -121,17 +121,12 @@
   }
 
   body {
-    @apply bg-slate-100 text-foreground antialiased selection:bg-blue-100 selection:text-blue-900;
+    @apply bg-white text-foreground antialiased selection:bg-blue-100 selection:text-blue-900;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
   /* Native Mobile Simulation */
-  :root {
-    --safe-top: env(safe-area-inset-top, 47px);
-    --safe-bottom: env(safe-area-inset-bottom, 34px);
-  }
-
   /* Desktop "Phone Frame" simulation */
   @media (min-width: 768px) {
     body {
@@ -139,7 +134,8 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background-image: radial-gradient(circle at center, #e2e8f0 0%, #cbd5e1 100%);
+      background-color: #f8fafc;
+      /* Neutral background */
     }
 
     /* Target the main container in layouts */
