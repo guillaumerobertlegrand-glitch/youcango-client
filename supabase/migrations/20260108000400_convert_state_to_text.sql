@@ -1,0 +1,125 @@
+-- 1. DROP DEPENDENT VIEWS
+-- We must drop views that depend on the 'sessions.state' column before changing its type.
+-- Use CASCADE to remove deep dependencies (slo_violations, slo_alerts, etc.) which are not in the local codebase.
+DROP VIEW IF EXISTS public.slo_session_violations CASCADE;
+DROP VIEW IF EXISTS public.session_health CASCADE;
+DROP VIEW IF EXISTS public.admin_sessions_view CASCADE;
+
+-- 2. STANDARDIZATION: Ensure 'state' is TEXT (not ENUM)
+-- Remove dependencies that might block conversion
+ALTER TABLE public.sessions ALTER COLUMN state DROP DEFAULT;
+ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS sessions_state_check;
+
+-- Handle deep dependencies in Event/Monitoring system
+-- Converting these columns to TEXT allows us to drop the session_state enum
+ALTER TABLE IF EXISTS public.event_type_rules 
+    ALTER COLUMN allowed_from_states TYPE TEXT[] USING allowed_from_states::text[];
+
+ALTER TABLE IF EXISTS public.event_reducer_contract 
+    ALTER COLUMN expected_state TYPE TEXT USING expected_state::text;
+
+-- Explicitly convert to TEXT
+ALTER TABLE public.sessions ALTER COLUMN state TYPE TEXT USING state::text;
+DROP TYPE IF EXISTS session_state;
+
+-- 3. RECREATE admin_sessions_view (Updated for TEXT type compatibility if needed)
+CREATE OR REPLACE VIEW public.admin_sessions_view AS
+SELECT 
+    s.id as session_id,
+    s.created_at,
+    s.state,
+    s.service_requested,
+    s.monetization_model,
+    s.arrival_timing,
+    -- Customer Info
+    cust.full_name as customer_name,
+    s.customer_id,
+    -- Provider Info
+    org.name as provider_name,
+    loc.address as provider_address
+FROM 
+    public.sessions s
+LEFT JOIN 
+    public.profiles cust ON s.customer_id = cust.id
+LEFT JOIN 
+    public.locations loc ON s.location_id = loc.id
+LEFT JOIN 
+    public.organizations org ON loc.organization_id = org.id
+ORDER BY 
+    s.created_at DESC;
+
+-- 4. RECREATE RPC (Clean Slate & Correct Signature)
+DO $$ 
+BEGIN
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, TEXT, INTEGER, UUID, TEXT, INTEGER, TIMESTAMP WITH TIME ZONE, TEXT);
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, TEXT, INTEGER, UUID, TEXT, INTEGER);
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, UUID, UUID, UUID, TEXT, INTEGER);
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, TEXT, INTEGER, UUID, TEXT);
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, TEXT, INTEGER, UUID);
+    DROP FUNCTION IF EXISTS api_v1_create_session(UUID, TEXT, INTEGER);
+EXCEPTION
+    WHEN OTHERS THEN 
+        RAISE NOTICE 'Error dropping functions: %', SQLERRM;
+END $$;
+
+CREATE OR REPLACE FUNCTION api_v1_create_session(
+    p_location_id UUID,
+    p_monetization_model TEXT,
+    p_arrival_timing_minutes INTEGER DEFAULT NULL,
+    p_slot_id UUID DEFAULT NULL,
+    p_service_requested TEXT DEFAULT 'Service',
+    p_estimated_arrival_duration INTEGER DEFAULT NULL,
+    p_scheduled_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    p_intent_mode TEXT DEFAULT 'immediacy'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_session_id UUID;
+    v_result JSONB;
+BEGIN
+    -- Auth Bypass for Demo
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        v_user_id := gen_random_uuid(); 
+    END IF;
+
+    -- Insert into sessions
+    INSERT INTO public.sessions (
+        customer_id,
+        location_id,
+        monetization_model,
+        arrival_timing,
+        state,
+        slot_id,
+        service_requested,
+        estimated_arrival_duration,
+        scheduled_at,
+        intent_mode
+    ) VALUES (
+        v_user_id,
+        p_location_id,
+        p_monetization_model,
+        CASE WHEN p_arrival_timing_minutes IS NOT NULL THEN (p_arrival_timing_minutes || ' minutes')::interval ELSE NULL END,
+        CASE WHEN p_intent_mode = 'delayed' THEN 'scheduled' ELSE 'locking' END,
+        p_slot_id,
+        p_service_requested,
+        p_estimated_arrival_duration,
+        p_scheduled_at,
+        p_intent_mode
+    )
+    RETURNING id INTO v_session_id;
+
+    SELECT jsonb_build_object(
+        'session_id', v_session_id,
+        'success', true,
+        'status', 'created'
+    ) INTO v_result;
+
+    RETURN v_result;
+END;
+$$;

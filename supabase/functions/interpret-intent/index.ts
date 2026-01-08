@@ -29,19 +29,26 @@ serve(async (req) => {
             - "grocery" (courses, supermarché, alimentation)
             - "electronics" (réparation, téléphone, informatique)
 
+            Analyse temporelle :
+            - Si l'utilisateur utilise des termes comme "ce soir", "demain", "mardi prochain", "à 20h", c'est un besoin différé.
+            - Si l'utilisateur dit "maintenant", "tout de suite" ou ne précise rien, c'est un besoin immédiat.
+
             Format attendu :
             {
                 "category": "service" | "merchant",
                 "extracted_category": "une des catégories autorisées ci-dessus",
                 "keywords": ["english_term1", "english_term2"],
-                "intent_summary": "résumé court",
-                "primary_business_type": "type spécifique"
+                "intent_summary": "résumé court inclus le moment si précisé",
+                "primary_business_type": "type spécifique",
+                "intent_mode": "immediacy" | "delayed",
+                "scheduled_at": "ISO_DATE_STRING" | null
             }
 
             Règles :
             - Si le besoin concerne une mise à disposition de temps ou d'espace (coiffeur, restaurant/table, médecin, garage), la catégorie est 'service'.
             - Si le besoin concerne un achat de produit physique à emporter (boulangerie, fleurs, vêtements), la catégorie est 'merchant'.
             - IMPORTANT : Traduis TOUJOURS les 'keywords' en Anglais (ex: 'coiffeur' -> 'barber', 'haircut'). La recherche database se fait en anglais.
+            - Pour "scheduled_at", convertis l'expression temporelle relative (ex: "ce soir") en une date future approximative ISO 8601. Nous sommes le ${new Date().toISOString()}.
             - Réponds UNIQUEMENT with le JSON, sans explications.`
 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`

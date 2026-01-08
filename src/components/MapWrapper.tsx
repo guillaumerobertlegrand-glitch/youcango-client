@@ -31,7 +31,9 @@ interface MapWrapperProps {
         keywords: string[];
         primary_business_type: string;
         extracted_category?: string;
-        intent_summary?: string; // Added intent_summary
+        intent_summary?: string;
+        intent_mode?: 'immediacy' | 'delayed'; // Added
+        scheduled_at?: string | null;          // Added
     } | null;
     onLoadingChange?: (loading: boolean) => void;
     onGuidanceStateChange?: (guiding: boolean) => void;
@@ -44,6 +46,15 @@ interface MapWrapperProps {
     onSessionUpdate?: (session: any) => void;
     unifiedMode?: boolean;
 }
+
+const DEMO_CONFIG = {
+    'immediacy_service': { lat: 48.8566, long: 2.3522 }, // Paris Center
+    'delayed_client': { lat: 45.7772, long: 3.0870 },    // Clermont-Ferrand
+    'delayed_rennes': { lat: 48.1173, long: -1.6778 },   // Rennes
+    'pro_service': { lat: 48.8566, long: 2.3522 },       // Same as Client
+    'pro_merchant': { lat: 48.8566, long: 2.3522 },      // Same as Client
+    'parallel': { lat: 48.8566, long: 2.3522 }           // Same as Client
+};
 
 const PARIS_FALLBACK = { lat: 48.8566, long: 2.3522 };
 
@@ -102,6 +113,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         return () => clearInterval(timer);
     }, [isLocking]);
 
+
+
     // Safety refs to track search state and avoid infinite loops
     const lastExecutionRef = useRef<string>("");
 
@@ -117,13 +130,33 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         return () => { isComponentMounted.current = false; };
     }, []);
 
-    // 1. Stable Geolocation
+    // 1. Stable Geolocation & Demo Presets
     useEffect(() => {
-        // [DEMO MODE] Force Paris location to see Seed Data (Dandy Barber)
-        // Ignoring real GPS for now because user might be far away
-        console.log("[MapWrapper] Forcing Mock Location (Paris) for Demo");
-        setUserLocation(PARIS_FALLBACK);
-    }, []);
+        console.log("[MapWrapper] Initializing Location Logic");
+
+        // CHECK DEMO MODE (Delayed -> Clermont-Ferrand OR Rennes)
+        if (intentData?.intent_mode === 'delayed' && intentData?.scheduled_at) {
+
+            // Check for Rennes in keywords
+            const isRennes = intentData.keywords?.some(k => k.toLowerCase().includes('rennes')) ||
+                intentData.intent_summary?.toLowerCase().includes('rennes');
+
+            if (isRennes) {
+                console.log("[MapWrapper] Demo Mode: Delayed (Rennes)");
+                setUserLocation(DEMO_CONFIG.delayed_rennes);
+                setViewState(prev => ({ ...prev, latitude: DEMO_CONFIG.delayed_rennes.lat, longitude: DEMO_CONFIG.delayed_rennes.long, zoom: 13 }));
+            } else {
+                console.log("[MapWrapper] Demo Mode: Delayed (Clermont-Ferrand)");
+                setUserLocation(DEMO_CONFIG.delayed_client);
+                setViewState(prev => ({ ...prev, latitude: DEMO_CONFIG.delayed_client.lat, longitude: DEMO_CONFIG.delayed_client.long, zoom: 13 }));
+            }
+
+        } else {
+            // Default Demo Location (Paris)
+            console.log("[MapWrapper] Demo Mode: Immediacy (Paris)");
+            setUserLocation(PARIS_FALLBACK);
+        }
+    }, [intentData?.intent_mode, intentData?.scheduled_at, intentData?.keywords, intentData?.intent_summary]);
 
     // 2. Stabilized Fetch Effect
     useEffect(() => {
@@ -232,7 +265,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
         fetchMerchants();
         return () => { isEffectAlive = false; };
-    }, [intentData?.category, JSON.stringify(intentData?.keywords || []), !!userLocation]);
+    }, [intentData?.category, JSON.stringify(intentData?.keywords || []), userLocation?.lat, userLocation?.long]);
 
     // 3. Dynamic Zoom & Centering logic
     useEffect(() => {
@@ -280,6 +313,24 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 },
                 (payload) => {
                     console.log("[MapWrapper] Session Update:", payload);
+
+                    // HANDLE SCHEDULED AUTO-LOCK
+                    if (payload.new.state === 'scheduled') {
+                        // Check if it's time to transition to locking (Simulated for Demo)
+                        // Real backend would handle this with a cron/trigger
+                        const scheduledTime = new Date(payload.new.scheduled_at).getTime();
+                        const now = Date.now();
+                        const timeToLock = scheduledTime - now;
+
+                        if (timeToLock > 0 && timeToLock < 60000) { // If within 1 minute
+                            console.log("[MapWrapper] Auto-Lock Scheduled in:", timeToLock, "ms");
+                            setTimeout(() => {
+                                // Trigger local locking simulation
+                                if (selectedStore) handleLock(selectedStore);
+                            }, timeToLock);
+                        }
+                    }
+
                     if (payload.new.state === 'cancelled') {
                         // 1. Exclude the merchant
                         if (selectedStore) {
@@ -450,7 +501,9 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             p_arrival_timing_minutes: arrivalTiming,
             p_slot_id: slotId,
             p_service_requested: serviceRequested, // Dynamic Service Name
-            p_estimated_arrival_duration: estimatedDuration // <--- REAL MAPBOX DATA
+            p_estimated_arrival_duration: estimatedDuration, // <--- REAL MAPBOX DATA
+            p_scheduled_at: intentData?.scheduled_at || null, // Pass Scheduled Time
+            p_intent_mode: intentData?.intent_mode || 'immediacy' // Pass Mode
         });
 
         if (error) {
@@ -467,6 +520,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             id: data.session_id // Map session_id to id
         };
         console.log("Session Created (Normalized):", newSession);
+
         setActiveSession(newSession);
         onSessionUpdate?.(newSession); // Notify parent
         activeSessionRef.current = newSession;
@@ -523,7 +577,15 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         }
 
         if (session) {
-            await supabase.from('sessions').update({ state: 'pending' }).eq('id', session.id);
+            console.log("[MapWrapper] Updating Session to PENDING:", session.id);
+            const { error } = await supabase.from('sessions').update({ state: 'pending' }).eq('id', session.id);
+            if (error) {
+                console.error("Critical: Failed to update session:", error);
+            } else {
+                console.log("[MapWrapper] Session updated to PENDING successfully.");
+            }
+        } else {
+            console.error("Critical: No Active Session found in Ref during Lock Expiration");
         }
     };
 
@@ -537,6 +599,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
     // Simulation Logic (Option #1: Path Interpolation)
     useEffect(() => {
+        console.log("[MapWrapper] Checking Simulation Pre-conditions:", { isRevealed, hasRoute: !!routeData, hasUser: !!userLocation });
         if (!isRevealed || !routeData || !userLocation) return;
 
         console.log("[MapWrapper] Starting Simulation on Route Path...");
@@ -554,15 +617,40 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         const simulationInterval = setInterval(() => {
             if (currentIndex >= coords.length) {
                 clearInterval(simulationInterval);
-                console.log("[MapWrapper] Simulation Arrived at destination");
-                // Optional: Trigger arrival automatically? No, let user click "I'm here".
+                console.log("[MapWrapper] Simulation Arrived at destination - Triggering Arrival");
+                handleArrival();
                 return;
             }
 
             const nextPoint = coords[currentIndex];
-            setUserLocation({ long: nextPoint[0], lat: nextPoint[1] });
+            console.log("Simulating step:", currentIndex, nextPoint);
 
-            onSimulationProgress?.(currentIndex / coords.length);
+            setUserLocation({ long: nextPoint[0], lat: nextPoint[1] });
+            setViewState(prev => ({ ...prev, longitude: nextPoint[0], latitude: nextPoint[1] })); // Follow user
+
+            const progress = (currentIndex / coords.length) * 100;
+            onSimulationProgress?.(progress);
+
+            // Update Estimated Time (decreasing)
+            const remainingSteps = coords.length - currentIndex;
+            const remainingTimeSec = (remainingSteps * tickInterval) / 1000;
+            const remainingMinutes = Math.ceil(remainingTimeSec / 60);
+
+            // Only update if changed
+            if (routeInfo && remainingMinutes !== Math.ceil(routeInfo.duration / 60)) {
+                onRouteInfoUpdate?.({ ...routeInfo, duration: remainingTimeSec });
+            }
+
+            // --- SYNC TO DB FOR PRO VIEW (Throttled) ---
+            if (activeSessionRef.current && currentIndex % 5 === 0) { // Every 5 ticks
+                // console.log("[MapWrapper] Syncing ETA to DB:", remainingMinutes, "min");
+                supabase.from('sessions')
+                    .update({ estimated_arrival_duration: remainingMinutes })
+                    .eq('id', activeSessionRef.current.id)
+                    .then(({ error }) => {
+                        if (error) console.error("Error syncing ETA:", error);
+                    });
+            }
 
             currentIndex += 1;
         }, tickInterval);

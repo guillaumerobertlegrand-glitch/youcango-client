@@ -8,8 +8,11 @@ export default function ProSessionListener() {
     const router = useRouter();
     const supabase = createClient();
 
+
+
     useEffect(() => {
         console.log("[ProSessionListener] Mounting and subscribing...");
+
 
         // Listen for NEW sessions (Booking Request)
         const channel = supabase
@@ -17,22 +20,21 @@ export default function ProSessionListener() {
             .on(
                 'postgres_changes',
                 {
-                    event: 'INSERT',
+                    event: '*',
                     schema: 'public',
                     table: 'sessions',
-                    filter: 'state=eq.locking'
                 },
                 (payload: any) => {
-                    console.log("[ProSessionListener] New Session Detected! 🚨", payload);
-                    const sessionId = payload.new?.id;
-                    if (sessionId) {
-                        router.push(`/pro/incoming-request?session_id=${sessionId}`);
+                    const state = payload.new?.state;
+                    const id = payload.new?.id;
+
+                    if (id && (state === 'locking' || state === 'pending')) {
+                        console.log(`[ProSessionListener] Triggering Request for session ${id}`);
+                        router.push(`/pro/incoming-request?session_id=${id}`);
                     }
                 }
             )
-            .subscribe((status) => {
-                console.log("[ProSessionListener] Subscription Status:", status);
-            });
+            .subscribe();
 
         return () => {
             console.log("[ProSessionListener] Unsubscribing");
@@ -40,5 +42,5 @@ export default function ProSessionListener() {
         };
     }, [router, supabase]);
 
-    return null; // Headless component
+    return null;
 }
