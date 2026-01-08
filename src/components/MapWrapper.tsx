@@ -141,7 +141,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             const isRennes = intentData.keywords?.some(k => k.toLowerCase().includes('rennes')) ||
                 intentData.intent_summary?.toLowerCase().includes('rennes');
 
-            if (isRennes) {
+            if (isRennes || intentData.category === 'florist' || intentData.extracted_category === 'florist') {
                 console.log("[MapWrapper] Demo Mode: Delayed (Rennes)");
                 setUserLocation(DEMO_CONFIG.delayed_rennes);
                 setViewState(prev => ({ ...prev, latitude: DEMO_CONFIG.delayed_rennes.lat, longitude: DEMO_CONFIG.delayed_rennes.long, zoom: 13 }));
@@ -267,6 +267,44 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         return () => { isEffectAlive = false; };
     }, [intentData?.category, JSON.stringify(intentData?.keywords || []), userLocation?.lat, userLocation?.long]);
 
+    // 2.5 Proximity Watcher for Scheduled/Delayed Sessions
+    useEffect(() => {
+        if (!activeSession || activeSession.state !== 'scheduled' || stores.length === 0) return;
+
+        const PROXIMITY_THRESHOLD = 800; // meters (Geofence radius)
+
+        const nearbyStore = stores.find(s => s.dist_meters < PROXIMITY_THRESHOLD);
+
+        if (nearbyStore) {
+            console.log("[MapWrapper] Proximity Trigger! User is", nearbyStore.dist_meters, "m from", nearbyStore.name);
+
+            // Debounce or ensure we don't spam updates
+            // (Strictly speaking this might fire multiple times, but Supabase handles idempotent updates well enough for demo)
+            // Ideally check if we are ALREADY locking to avoid spam.
+
+            // Transition to LOCKING
+            // 1. Trigger UI Locking State IMMEDIATELY
+            setSelectedStore(nearbyStore);
+            onStoreSelected?.(nearbyStore);
+            setIsLocking(true);
+            onLockingChange?.(true);
+            onLockProgress?.(100);
+
+            // 2. Optimistic Session Update
+            const updatedSession = { ...activeSession, state: 'locking' };
+            setActiveSession(updatedSession);
+            activeSessionRef.current = updatedSession;
+
+            // 3. Persist to DB
+            supabase.from('sessions')
+                .update({ state: 'locking' })
+                .eq('id', activeSession.id)
+                .then(({ error }) => {
+                    if (!error) console.log("[MapWrapper] Session transitioned to LOCKING via Proximity.");
+                });
+        }
+    }, [stores, activeSession]); // Re-run when location updates (stores update dist) or session state changes
+
     // 3. Dynamic Zoom & Centering logic
     useEffect(() => {
         // STOP auto-zoom if we are locked or guiding (simulation handles view)
@@ -317,22 +355,27 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                 (payload) => {
                     console.log("[MapWrapper] Session Update:", payload);
 
-                    // HANDLE SCHEDULED AUTO-LOCK
+                    // HANDLE SCHEDULED AUTO-LOCK (TIME or PROXIMITY)
                     if (payload.new.state === 'scheduled') {
-                        // Check if it's time to transition to locking (Simulated for Demo)
-                        // Real backend would handle this with a cron/trigger
+                        // 1. TIME: Check if it's time to transition
                         const scheduledTime = new Date(payload.new.scheduled_at).getTime();
                         const now = Date.now();
                         const timeToLock = scheduledTime - now;
 
-                        if (timeToLock > 0 && timeToLock < 60000) { // If within 1 minute
-                            console.log("[MapWrapper] Auto-Lock Scheduled in:", timeToLock, "ms");
-                            setTimeout(() => {
-                                // Trigger local locking simulation
-                                if (selectedStore) handleLock(selectedStore);
+                        if (timeToLock > 0 && timeToLock < 600000) { // If within 10 minutes
+                            console.log("[MapWrapper] Auto-Lock Scheduled (Time) in:", timeToLock, "ms");
+                            setTimeout(async () => {
+                                if (activeSessionRef.current) {
+                                    await supabase.from('sessions').update({ state: 'locking' }).eq('id', activeSessionRef.current.id);
+                                }
                             }, timeToLock);
                         }
                     }
+
+                    // 2. PROXIMITY CHECK (Reactive)
+                    // This is handled in the `stores` useEffect, but we can also check here if we have live store data.
+                    // However, `stores` state might be stale in this callback closure.
+                    // Ideally, we rely on the `useEffect` watching `stores` & `activeSession` below.
 
                     if (payload.new.state === 'cancelled') {
                         // 1. Exclude the merchant
