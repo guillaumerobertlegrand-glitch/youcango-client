@@ -30,6 +30,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         { id: 'init', text: 'Bonjour ! Que puis-je faire pour vous ?', sender: 'system' }
     ]);
     const [inputValue, setInputValue] = useState("");
+    const [isFadingOut, setIsFadingOut] = useState(false); // New state for fade animation
     // Overlay State (C5/C6 Clean Mode)
     const [isOverlayVisible, setIsOverlayVisible] = useState(false);
 
@@ -45,12 +46,36 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     const handleIntentCaptured = (data: any, userText?: string) => {
         console.log("[ClientHome] handleIntentCaptured triggered. UserText:", userText, "Data:", data);
         if (userText) {
-            setMessages([{
+            setMessages(prev => [{
                 id: Date.now().toString(),
                 text: userText,
                 sender: 'user'
             }]);
         }
+
+        // --- DELAYED REQUEST FEEDBACK FLOW ---
+        if (data.intent_mode === 'delayed') {
+            // 1. Show Confirmation
+            setMessages(prev => [...prev, {
+                id: 'system-confirm',
+                text: "Noted. I'll make sure to remind you at the right time.",
+                sender: 'system'
+            }]);
+
+            // 2. Wait 5 seconds, then Fade Out
+            setTimeout(() => {
+                setIsFadingOut(true);
+
+                // 3. Wait 3 seconds (fade), then Reset
+                setTimeout(() => {
+                    handleBackToC1();
+                    setIsFadingOut(false);
+                }, 3000);
+            }, 5000);
+
+            return; // STOP: Do not proceed to C2 (Map)
+        }
+
         setIntentData(data);
         setStep('C2');
     };
@@ -63,7 +88,9 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         setStep('C1');
         setIntentData(null);
         setIsGuiding(false);
-        setMessages([]);
+        setMessages([
+            { id: 'init', text: 'Bonjour ! Que puis-je faire pour vous ?', sender: 'system' }
+        ]);
         setSelectedStore(null);
         setRouteInfo(null);
         setIsOverlayVisible(false); // Reset overlay
@@ -130,7 +157,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
             {/* Map Area - Full Screen - Interactive */}
             <div className="flex-1 relative w-full h-full">
                 {step === 'C1' ? (
-                    <div className="h-full w-full">
+                    <div className={`h-full w-full transition-opacity duration-[3000ms] ease-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
                         <IntentCapture
                             messages={messages}
                             inputValue={inputValue}
