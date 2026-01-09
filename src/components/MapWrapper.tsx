@@ -23,6 +23,8 @@ interface Store {
     long: number;
     dist_meters: number;
     location_id: string; // Needed for Session creation
+    phone?: string;
+    image_url?: string;
 }
 
 interface MapWrapperProps {
