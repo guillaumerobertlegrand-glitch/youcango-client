@@ -127,13 +127,13 @@ export default function IncomingRequestPage() {
     // MERCHAT FLOW (P3M) - STRICTLY SEPARATED COPY
     if (isMerchant) {
         return (
-            <div className="flex flex-col h-full w-full px-4 relative"> {/* Added relative for absolute positioning */}
+            <div className="flex flex-col min-h-full w-full relative"> {/* Removed px-4, use min-h-full */}
 
                 {/* Top Spacer */}
                 <div className="flex-1" />
 
                 {/* Main Content Wrapper (Centered) */}
-                <div className="w-full flex flex-col items-center justify-center space-y-4">
+                <div className="w-full flex flex-col items-center justify-center space-y-4 px-4 pt-4 pb-32"> {/* Added padding to content */}
 
                     {/* Main Request Card (Reduced Height, Responsive) - Unified Color (#E9E9EB) */}
                     <div className="w-full bg-[#E9E9EB] backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
@@ -145,7 +145,7 @@ export default function IncomingRequestPage() {
                     </div>
 
                     {/* Details (Restored ETA) */}
-                    <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2 pb-20"> {/* Added pb-20 to avoid overlap */}
+                    <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2">
                         <div className="text-sm font-medium text-slate-800">
                             Estimated service - {requestData.duration}
                         </div>
@@ -159,31 +159,34 @@ export default function IncomingRequestPage() {
                 {/* Bottom Spacer */}
                 <div className="flex-1" />
 
-                {/* SMS Bubble Pill (Floating above Bottom Bar) */}
-                <div className="absolute bottom-[90px] left-4 right-auto bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%] z-10">
-                    <span className="font-normal text-slate-900 text-[15px] leading-snug">
-                        {requestData.customerStatus}
-                    </span>
-                </div>
+                {/* Sticky Footer Wrapper (Contains Button + Pill) */}
+                <div className="sticky bottom-0 z-50 w-full">
+                    {/* SMS Bubble Pill (Floating above Bottom Bar) */}
+                    <div className="absolute bottom-full left-4 mb-6 bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%]">
+                        <span className="font-normal text-slate-900 text-sm leading-snug">
+                            {requestData.customerStatus}
+                        </span>
+                    </div>
 
-                {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-                <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
-                    <Button
-                        onClick={handleDecline}
-                        variant="ghost"
-                        className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
-                    >
-                        {/* Progress Background (Emptying) - Matches C2 Style */}
-                        <div
-                            className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
-                            style={{ width: `${progress}%` }}
-                        />
+                    {/* Decline Button (Client Style: Flush Bottom) */}
+                    <div className="relative w-full shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                        <Button
+                            onClick={handleDecline}
+                            variant="ghost"
+                            className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
+                        >
+                            {/* Progress Background (Emptying) - Matches C2 Style */}
+                            <div
+                                className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
+                                style={{ width: `${progress}%` }}
+                            />
 
-                        {/* Content */}
-                        <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
-                            <span className="font-medium text-lg text-slate-900">Decline?</span>
-                        </div>
-                    </Button>
+                            {/* Content */}
+                            <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
+                                <span className="font-medium text-lg text-slate-900">Decline?</span>
+                            </div>
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
@@ -191,15 +194,13 @@ export default function IncomingRequestPage() {
 
     // SERVICE FLOW (P3) - PRESERVED EXISTING UI (Updated with Client Style Button)
     return (
-        <div className="flex flex-col h-full w-full relative pb-24"> {/* Added pb-24 for scroll clearance */}
+        <div className="flex flex-col min-h-full w-full relative"> {/* Removed global padding usage */}
 
             {/* Top Spacer */}
             <div className="flex-1" />
 
             {/* Main Content Wrapper (Centered) */}
-            <div className="w-full flex flex-col items-center justify-center space-y-4"> {/* Removed px-4 (handled by layout? wait, I need to check if I removed it from root) */}
-                {/* ProLayout has px-4. My previous edit removed root px-4. So this div is unpadded? No, parent has padding. */}
-                {/* To be safe, I'll rely on parent padding for X, but ensure spacing. */}
+            <div className="w-full flex flex-col items-center justify-center space-y-4 px-4 pt-4 pb-32"> {/* Added padding & spacer */}
 
                 {/* Main Request Card (Reduced Height, Responsive) - Unified Color (#E9E9EB) */}
                 <div className="w-full bg-[#E9E9EB] backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
@@ -225,31 +226,34 @@ export default function IncomingRequestPage() {
             {/* Bottom Spacer */}
             <div className="flex-1" />
 
-            {/* SMS Bubble Pill (Floating above Bottom Bar) */}
-            <div className="absolute bottom-[90px] left-4 right-auto bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%] z-10">
-                <span className="font-normal text-slate-900 text-[15px] leading-snug">
-                    {requestData.customerStatus}
-                </span>
-            </div>
+            {/* Sticky Footer Wrapper (Contains Button + Pill) */}
+            <div className="sticky bottom-0 z-50 w-full">
+                {/* SMS Bubble Pill (Popped up above button) */}
+                <div className="absolute bottom-full left-4 mb-6 bg-slate-100 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%]">
+                    <span className="font-normal text-slate-900 text-sm leading-snug">
+                        {requestData.customerStatus}
+                    </span>
+                </div>
 
-            {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
-                <Button
-                    onClick={handleDecline}
-                    variant="ghost"
-                    className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
-                >
-                    {/* Progress Background (Emptying) - Matches C2 Style */}
-                    <div
-                        className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
-                        style={{ width: `${progress}%` }}
-                    />
+                {/* Decline Button (Client Style: Flush Bottom) */}
+                <div className="relative w-full shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                    <Button
+                        onClick={handleDecline}
+                        variant="ghost"
+                        className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
+                    >
+                        {/* Progress Background (Emptying) - Matches C2 Style */}
+                        <div
+                            className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
+                            style={{ width: `${progress}%` }}
+                        />
 
-                    {/* Content */}
-                    <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
-                        <span className="font-medium text-lg text-slate-900">Decline?</span>
-                    </div>
-                </Button>
+                        {/* Content */}
+                        <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
+                            <span className="font-medium text-lg text-slate-900">Decline?</span>
+                        </div>
+                    </Button>
+                </div>
             </div>
         </div>
     );
