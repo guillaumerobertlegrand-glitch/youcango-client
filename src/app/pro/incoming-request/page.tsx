@@ -167,7 +167,7 @@ export default function IncomingRequestPage() {
                 </div>
 
                 {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-                <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
                     <Button
                         onClick={handleDecline}
                         variant="ghost"
@@ -191,13 +191,15 @@ export default function IncomingRequestPage() {
 
     // SERVICE FLOW (P3) - PRESERVED EXISTING UI (Updated with Client Style Button)
     return (
-        <div className="flex flex-col h-full w-full relative"> {/* Removed px-4 */}
+        <div className="flex flex-col h-full w-full relative pb-24"> {/* Added pb-24 for scroll clearance */}
 
             {/* Top Spacer */}
             <div className="flex-1" />
 
             {/* Main Content Wrapper (Centered) */}
-            <div className="w-full flex flex-col items-center justify-center space-y-4 px-4"> {/* Added px-4 */}
+            <div className="w-full flex flex-col items-center justify-center space-y-4"> {/* Removed px-4 (handled by layout? wait, I need to check if I removed it from root) */}
+                {/* ProLayout has px-4. My previous edit removed root px-4. So this div is unpadded? No, parent has padding. */}
+                {/* To be safe, I'll rely on parent padding for X, but ensure spacing. */}
 
                 {/* Main Request Card (Reduced Height, Responsive) - Unified Color (#E9E9EB) */}
                 <div className="w-full bg-[#E9E9EB] backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
@@ -209,7 +211,7 @@ export default function IncomingRequestPage() {
                 </div>
 
                 {/* Details (Restored ETA) */}
-                <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2 pb-20"> {/* Added pb-20 */}
+                <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2 pb-4">
                     <div className="text-sm font-medium text-slate-800">
                         Estimated service - {requestData.duration}
                     </div>
@@ -231,7 +233,7 @@ export default function IncomingRequestPage() {
             </div>
 
             {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-            <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
                 <Button
                     onClick={handleDecline}
                     variant="ghost"
