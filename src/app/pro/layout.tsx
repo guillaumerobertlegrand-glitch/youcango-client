@@ -35,8 +35,8 @@ export default function ProLayout({
                 </div>
             </header>
 
-            {/* Scrollable Content (Fills remaining space) */}
-            <div className="flex-1 flex flex-col overflow-y-auto px-4 pb-6 hide-scrollbar relative">
+            {/* Scrollable Content (Fills remaining space) - Removed global padding for edge-to-edge flexibility */}
+            <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar relative">
                 {children}
             </div>
         </main>
