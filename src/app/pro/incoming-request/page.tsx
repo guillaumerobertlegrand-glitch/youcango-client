@@ -23,6 +23,7 @@ export default function IncomingRequestPage() {
     const searchParams = useSearchParams();
     const sessionId = searchParams.get('session_id');
     const supabase = createClient();
+    const [progress, setProgress] = useState(100);
     const [requestData, setRequestData] = useState(DEFAULT_REQUEST);
 
     const [isMerchant, setIsMerchant] = useState(false);
@@ -58,20 +59,27 @@ export default function IncomingRequestPage() {
         fetchSession();
     }, [sessionId]);
 
-    // Timer Logic - Updates progress regularly for smooth animation (Logic kept for auto-accept, visual removed)
+    // Timer Logic - Updates progress regularly for smooth animation
     useEffect(() => {
-        // We keep the timer for auto-accept logic if needed, or remove it entirely if user wants manual only?
-        // User didn't say remove AUTO-ACCEPT. They said change UI of DECLINE.
-        // Assuming Auto-Accept is still desired behavior for "Incoming Request" context (often time-boxed).
-        // I will keep the logic but remove the visual progress bar state usage for the button.
+        const updateFrequency = 100; // ms
+        // Calculate how much percentage to remove per tick
+        const totalTicks = (COUNTDOWN_SECONDS * 1000) / updateFrequency;
+        const step = 100 / totalTicks;
 
-        const timer = setTimeout(() => {
-            // handleAutoAccept(); // Wait, usually incoming request auto-expires (Decline) or Auto-Accepts?
-            // Previous code was Auto-Accepting on timeout. I'll keep that logic for now to not break flow logic.
-            handleAutoAccept();
-        }, COUNTDOWN_SECONDS * 1000);
+        const timer = setInterval(() => {
+            setProgress((prev) => {
+                const newProgress = prev - step;
+                if (newProgress <= 0) {
+                    clearInterval(timer);
+                    // Wait a tick then accept
+                    setTimeout(handleAutoAccept, 100);
+                    return 0;
+                }
+                return newProgress;
+            });
+        }, updateFrequency);
 
-        return () => clearTimeout(timer);
+        return () => clearInterval(timer);
     }, []);
 
     const handleAutoAccept = async () => {
@@ -119,7 +127,7 @@ export default function IncomingRequestPage() {
     // MERCHAT FLOW (P3M) - STRICTLY SEPARATED COPY
     if (isMerchant) {
         return (
-            <div className="flex flex-col h-full w-full px-4">
+            <div className="flex flex-col h-full w-full px-4 relative"> {/* Added relative for absolute positioning */}
 
                 {/* Top Spacer */}
                 <div className="flex-1" />
@@ -137,7 +145,7 @@ export default function IncomingRequestPage() {
                     </div>
 
                     {/* Details (Restored ETA) */}
-                    <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2">
+                    <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2 pb-20"> {/* Added pb-20 to avoid overlap */}
                         <div className="text-sm font-medium text-slate-800">
                             Estimated service - {requestData.duration}
                         </div>
@@ -151,32 +159,39 @@ export default function IncomingRequestPage() {
                 {/* Bottom Spacer */}
                 <div className="flex-1" />
 
-                <div className="w-full flex justify-between items-end mb-6">
-                    {/* SMS Bubble Pill (Bottom Left) */}
-                    <div className="bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%]">
-                        <span className="font-normal text-slate-900 text-[15px] leading-snug">
-                            {requestData.customerStatus}
-                        </span>
-                    </div>
+                {/* SMS Bubble Pill (Floating above Bottom Bar) */}
+                <div className="absolute bottom-[90px] left-4 right-auto bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%] z-10">
+                    <span className="font-normal text-slate-900 text-[15px] leading-snug">
+                        {requestData.customerStatus}
+                    </span>
+                </div>
 
-                    {/* New Circular Decline Button (Bottom Right) */}
-                    <div className="flex flex-col items-center gap-1 animate-in fade-in slide-in-from-right duration-500">
-                        <button
-                            onClick={handleDecline}
-                            className="h-14 w-14 rounded-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all active:scale-95"
-                        >
-                            <X size={28} strokeWidth={3} />
-                        </button>
-                        <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wide">Decline</span>
-                    </div>
+                {/* Decline Button (Client Style: Fixed Bottom Bar) */}
+                <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                    <Button
+                        onClick={handleDecline}
+                        variant="ghost"
+                        className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
+                    >
+                        {/* Progress Background (Emptying) - Matches C2 Style */}
+                        <div
+                            className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
+                            style={{ width: `${progress}%` }}
+                        />
+
+                        {/* Content */}
+                        <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
+                            <span className="font-medium text-lg text-slate-900">Decline?</span>
+                        </div>
+                    </Button>
                 </div>
             </div>
         );
     }
 
-    // SERVICE FLOW (P3) - PRESERVED EXISTING UI (Updated with Button)
+    // SERVICE FLOW (P3) - PRESERVED EXISTING UI (Updated with Client Style Button)
     return (
-        <div className="flex flex-col h-full w-full px-4">
+        <div className="flex flex-col h-full w-full px-4 relative"> {/* Added relative */}
 
             {/* Top Spacer */}
             <div className="flex-1" />
@@ -194,7 +209,7 @@ export default function IncomingRequestPage() {
                 </div>
 
                 {/* Details (Restored ETA) */}
-                <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2">
+                <div className="w-full space-y-1 text-right animate-in fade-in slide-in-from-bottom duration-700 delay-200 px-2 pb-20"> {/* Added pb-20 */}
                     <div className="text-sm font-medium text-slate-800">
                         Estimated service - {requestData.duration}
                     </div>
@@ -208,24 +223,31 @@ export default function IncomingRequestPage() {
             {/* Bottom Spacer */}
             <div className="flex-1" />
 
-            <div className="w-full flex justify-between items-end mb-6">
-                {/* SMS Bubble Pill (Bottom Left) */}
-                <div className="bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%]">
-                    <span className="font-normal text-slate-900 text-[15px] leading-snug">
-                        {requestData.customerStatus}
-                    </span>
-                </div>
+            {/* SMS Bubble Pill (Floating above Bottom Bar) */}
+            <div className="absolute bottom-[90px] left-4 right-auto bg-[#E9E9EB] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm animate-in fade-in slide-in-from-left duration-500 max-w-[65%] z-10">
+                <span className="font-normal text-slate-900 text-[15px] leading-snug">
+                    {requestData.customerStatus}
+                </span>
+            </div>
 
-                {/* New Circular Decline Button (Bottom Right) */}
-                <div className="flex flex-col items-center gap-1 animate-in fade-in slide-in-from-right duration-500">
-                    <button
-                        onClick={handleDecline}
-                        className="h-14 w-14 rounded-full bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center shadow-lg hover:scale-105 transition-all active:scale-95"
-                    >
-                        <X size={28} strokeWidth={3} />
-                    </button>
-                    <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wide">Decline</span>
-                </div>
+            {/* Decline Button (Client Style: Fixed Bottom Bar) */}
+            <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                <Button
+                    onClick={handleDecline}
+                    variant="ghost"
+                    className="relative w-full rounded-none border-0 bg-white text-slate-900 font-bold text-lg h-[calc(env(safe-area-inset-bottom)+60px)] pb-[env(safe-area-inset-bottom)] hover:bg-slate-50 transition-all overflow-hidden p-0"
+                >
+                    {/* Progress Background (Emptying) - Matches C2 Style */}
+                    <div
+                        className="absolute inset-y-0 left-0 bg-slate-200 transition-[width] duration-100 ease-linear"
+                        style={{ width: `${progress}%` }}
+                    />
+
+                    {/* Content */}
+                    <div className="flex items-center justify-center w-full relative z-10 px-8 h-[60px]">
+                        <span className="font-medium text-lg text-slate-900">Decline?</span>
+                    </div>
+                </Button>
             </div>
         </div>
     );
