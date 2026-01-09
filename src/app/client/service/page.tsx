@@ -7,6 +7,8 @@ import { Settings } from "lucide-react"; // Import Settings icon
 import { Button } from "@/components/ui/button";
 
 function ClientServiceContent() {
+    const [monetizationModel, setMonetizationModel] = useState<string | null>(null);
+
     const router = useRouter();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get('session_id');
@@ -29,13 +31,17 @@ function ClientServiceContent() {
             try {
                 const { data: session, error } = await supabase
                     .from('sessions')
-                    .select('state')
+                    .select('state, monetization_model')
                     .eq('id', sessionId)
                     .single();
 
                 if (error) {
                     console.error("[ClientService] Check Error:", error);
                     return false;
+                }
+
+                if (session?.monetization_model) {
+                    setMonetizationModel(session.monetization_model);
                 }
 
                 console.log("[ClientService] Fetched Session State:", session?.state);
@@ -124,7 +130,11 @@ function ClientServiceContent() {
 
                         <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-3xl bg-white/40">
                             <h2 className="text-2xl font-bold text-slate-800 tracking-tight text-center px-6 leading-tight">
-                                Service<br />in progress
+                                {monetizationModel === 'subscription' ? (
+                                    <>Transaction<br />in progress</>
+                                ) : (
+                                    <>Service<br />in progress</>
+                                )}
                             </h2>
                         </div>
                     </div>

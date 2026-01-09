@@ -86,21 +86,40 @@ export default function ActiveSessionPage() {
         router.push(`/pro/completion?session_id=${sessionId}`);
     };
 
+    // 3. Merchant Auto-Complete Timer (Top-Level Hook)
+    // Must be defined here so handleCompletion is in scope
+    useEffect(() => {
+        if (dbState === 'in_progress' && isMerchant) {
+            const timer = setTimeout(() => {
+                console.log("[ActiveSession] Merchant Auto-Complete Triggered (10s)");
+                handleCompletion();
+            }, 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [dbState, isMerchant]);
+
     // --- RENDER LOGIC BASED ON DB STATE ---
 
     // P5: Service In Progress (state == 'in_progress')
     if (dbState === 'in_progress') {
         if (isMerchant) {
             // MERCHANT MODE (Passive P5)
+            // Auto-complete handled by top-level useEffect
+
             return (
-                <div className="flex-1 flex flex-col justify-center items-center gap-12 px-6">
-                    <div className="text-center relative">
-                        <div className="absolute inset-0 bg-green-500/10 blur-2xl rounded-full animate-pulse z-0"></div>
-                        <h2 className="relative z-10 text-4xl font-black leading-[1.1] tracking-tight text-slate-900 animate-pulse">
-                            Client<br />in store
-                        </h2>
+                <div className="flex-1 flex flex-col justify-center items-center gap-12 px-6 animate-in fade-in duration-1000">
+                    {/* Zen Circle */}
+                    <div className="relative flex items-center justify-center w-72 h-72">
+                        {/* Soft Pulsing rings */}
+                        <div className="absolute inset-0 bg-green-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                        <div className="absolute inset-8 bg-green-500/5 rounded-full animate-[ping_4s_cubic-bezier(0,0,0.2,1)_infinite] delay-1000" />
+
+                        <div className="relative w-full h-full glass rounded-full flex flex-col items-center justify-center border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.05)] backdrop-blur-3xl bg-white/40">
+                            <h2 className="text-2xl font-bold text-slate-800 tracking-tight text-center px-6 leading-tight">
+                                Client<br />in store
+                            </h2>
+                        </div>
                     </div>
-                    <div className="text-xl text-slate-500 font-medium">No action needed</div>
                 </div>
             );
         } else {
