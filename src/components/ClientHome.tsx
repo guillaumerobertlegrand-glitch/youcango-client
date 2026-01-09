@@ -225,12 +225,19 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                         <div className="flex items-center gap-4">
                                             {/* Avatar (Pro Photo) */}
                                             <div className="h-16 w-16 rounded-full bg-slate-200 shadow-sm border-2 border-white relative overflow-hidden flex-shrink-0">
-                                                <img
-                                                    src="/avatars/barber-mike.jpg" // Keep avatar for demo visual, or fetch if available
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                    alt={selectedStore?.name || "Provider"}
-                                                    className="w-full h-full object-cover"
-                                                />
+                                                {selectedStore?.image_url ? (
+                                                    <img
+                                                        src={selectedStore.image_url}
+                                                        alt={selectedStore.name || "Provider"}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-slate-300">
+                                                        {/* Fallback Icon if no image */}
+                                                        <span className="text-2xl">🏪</span>
+                                                    </div>
+                                                )}
                                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-slate-200 flex items-center justify-center text-slate-400 font-bold text-xl -z-10">
                                                     {(selectedStore?.name?.[0] || "P").toUpperCase()}
                                                 </div>
@@ -250,9 +257,11 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                                     <span className="text-[13px] text-slate-400 font-medium leading-snug">
                                                         {selectedStore?.address || 'Location Details'}
                                                     </span>
-                                                    <span className="text-[13px] text-blue-600 font-medium mt-1">
-                                                        01 00 00 00 00
-                                                    </span>
+                                                    {selectedStore?.phone && (
+                                                        <span className="text-[13px] text-blue-600 font-medium mt-1">
+                                                            {selectedStore.phone}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
