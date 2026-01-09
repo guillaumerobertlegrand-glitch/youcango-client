@@ -27,7 +27,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
     const [isLocking, setIsLocking] = useState(false);
     const [lockProgress, setLockProgress] = useState(100);
     const [messages, setMessages] = useState<Message[]>([
-        { id: 'init', text: "Hi! Where do you want to go?", sender: 'system' }
+        { id: 'init', text: "Hi! What do you need?", sender: 'system' }
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isFadingOut, setIsFadingOut] = useState(false); // New state for fade animation
@@ -89,7 +89,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
         setIntentData(null);
         setIsGuiding(false);
         setMessages([
-            { id: 'init', text: "Hi! Where do you want to go?", sender: 'system' }
+            { id: 'init', text: "Hi! What do you need?", sender: 'system' }
         ]);
         setSelectedStore(null);
         setRouteInfo(null);
