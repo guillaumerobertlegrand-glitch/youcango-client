@@ -167,7 +167,7 @@ export default function IncomingRequestPage() {
                 </div>
 
                 {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-                <div className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
                     <Button
                         onClick={handleDecline}
                         variant="ghost"
@@ -191,13 +191,13 @@ export default function IncomingRequestPage() {
 
     // SERVICE FLOW (P3) - PRESERVED EXISTING UI (Updated with Client Style Button)
     return (
-        <div className="flex flex-col h-full w-full px-4 relative"> {/* Added relative */}
+        <div className="flex flex-col h-full w-full relative"> {/* Removed px-4 */}
 
             {/* Top Spacer */}
             <div className="flex-1" />
 
             {/* Main Content Wrapper (Centered) */}
-            <div className="w-full flex flex-col items-center justify-center space-y-4">
+            <div className="w-full flex flex-col items-center justify-center space-y-4 px-4"> {/* Added px-4 */}
 
                 {/* Main Request Card (Reduced Height, Responsive) - Unified Color (#E9E9EB) */}
                 <div className="w-full bg-[#E9E9EB] backdrop-blur-sm border-0 shadow-sm rounded-[24px] overflow-hidden min-h-[160px] flex items-center justify-center relative group animate-in zoom-in-95 duration-500 p-6">
@@ -231,7 +231,7 @@ export default function IncomingRequestPage() {
             </div>
 
             {/* Decline Button (Client Style: Fixed Bottom Bar) */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+            <div className="absolute bottom-0 left-0 right-0 z-50 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
                 <Button
                     onClick={handleDecline}
                     variant="ghost"
