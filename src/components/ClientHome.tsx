@@ -324,7 +324,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                     type="text"
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder="What do you need?"
+                                    placeholder=""
                                     className="w-full bg-slate-100 border-none rounded-full px-4 py-2.5 text-[16px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 placeholder:text-slate-400 font-medium transition-all shadow-inner"
                                 />
                                 {!inputValue && (
