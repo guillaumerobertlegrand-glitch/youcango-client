@@ -40,14 +40,7 @@ export default function ProSessionListener() {
                     }
                 }
             )
-            .subscribe((status) => {
-                console.log(`[ProSessionListener] Subscription Status: ${status}`);
-                if (status === 'SUBSCRIBED') {
-                    console.log("[ProSessionListener] ✅ Connected to Realtime");
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error("[ProSessionListener] ❌ Realtime Channel Error");
-                }
-            });
+            .subscribe();
 
         return () => {
             console.log("[ProSessionListener] Unsubscribing");
