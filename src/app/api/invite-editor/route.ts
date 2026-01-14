@@ -12,19 +12,19 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { email, organization_id, first_name, last_name } = await request.json();
+        const { email, organization_id, first_name, last_name, role = 'editor' } = await request.json();
 
         if (!email || !organization_id) {
             return NextResponse.json({ error: "Email and Organization ID are required" }, { status: 400 });
         }
 
         // 1. Verify Permission & Create DB Record (RPC)
-        // We use the USER'S client to call RPC, so RLS security checks (get_my_role = admin) apply naturally.
         const { data: inviteData, error: inviteError } = await supabase.rpc('api_v1_invite_editor', {
             p_org_id: organization_id,
             p_email: email,
             p_first_name: first_name || "Invited",
-            p_last_name: last_name || "User"
+            p_last_name: last_name || "User",
+            p_role: role
         });
 
         if (inviteError) {
@@ -37,11 +37,10 @@ export async function POST(request: Request) {
         }
 
         // 2. Trigger Auth Invite (Admin Client)
-        // Now that DB record is safely created/validated by RPC, we send the email.
         const supabaseAdmin = createAdminClient();
         const { error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
-                role: 'editor',
+                role: role,
                 organization_id: organization_id,
                 first_name: first_name,
                 last_name: last_name
@@ -51,7 +50,9 @@ export async function POST(request: Request) {
 
         if (authError) {
             console.error("Auth Invite Error:", authError);
-            return NextResponse.json({ error: "Failed to send invitation email." }, { status: 500 });
+            return NextResponse.json({
+                error: `Failed to send invitation email: ${authError.message}`
+            }, { status: 500 });
         }
 
         return NextResponse.json({ success: true, message: "Invitation sent successfully." });
