@@ -43,7 +43,17 @@ export default function Step4TeamPage() {
 
     const fetchData = async (oid: string) => {
         const { data: pros } = await supabase.from('professionals').select('*, devices(*)').eq('organization_id', oid);
-        const { data: devs } = await supabase.from('devices').select('*').eq('organization_id', oid);
+        let { data: devs } = await supabase.from('devices').select('*').eq('organization_id', oid);
+
+        // AUTO-SEED: If no devices, create defaults so the user isn't stuck
+        if (!devs || devs.length === 0) {
+            await supabase.from('devices').insert([
+                { organization_id: oid, name: 'Caisse Principale', status: 'unused', type: 'tablet' },
+                { organization_id: oid, name: 'Tablette Mobile', status: 'unused', type: 'phone' }
+            ]);
+            const { data: newDevs } = await supabase.from('devices').select('*').eq('organization_id', oid);
+            devs = newDevs;
+        }
 
         setTeam(pros || []);
         setDevices(devs || []);

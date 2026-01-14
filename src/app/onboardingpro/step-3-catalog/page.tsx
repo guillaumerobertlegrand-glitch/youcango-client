@@ -42,12 +42,15 @@ export default function Step3CatalogPage() {
 
     const addService = async () => {
         if (!orgId || !newTitle) return;
+
+        // Convert integer minutes to interval string (e.g. '30 minutes')
+        const intervalString = `${newDuration} minutes`;
+
         const { error } = await supabase.from('services').insert({
             organization_id: orgId,
-            title: newTitle,
-            duration_min: newDuration,
-            duration_max: newDuration,
-            price_amount: newPrice,
+            designation: newTitle, // Was title
+            estimated_duration: intervalString, // Was duration_min/max
+            price: newPrice, // Was price_amount
             active: true
         });
 
@@ -95,8 +98,11 @@ export default function Step3CatalogPage() {
                     {services.map(s => (
                         <div key={s.id} className="flex justify-between items-center p-3 bg-slate-50 rounded border">
                             <div>
-                                <p className="font-medium">{s.title}</p>
-                                <p className="text-xs text-gray-500">{s.duration_min} min • {s.price_amount}€</p>
+                                <p className="font-medium">{s.designation}</p>
+                                <p className="text-xs text-gray-500">
+                                    {/* Display raw interval or parse it roughly if needed */}
+                                    {s.estimated_duration} • {s.price}€
+                                </p>
                             </div>
                             <Button variant="ghost" size="icon" onClick={() => deleteService(s.id)}>
                                 <Trash2 className="w-4 h-4 text-red-500" />

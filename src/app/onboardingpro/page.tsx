@@ -46,9 +46,8 @@ export default function OnboardingDispatcher() {
                     // @ts-ignore
                     router.push(routes[step] || routes[1]);
                 } else {
-                    // No Org -> Show Creation Form
-                    setIsCreating(true);
-                    setLoading(false);
+                    // No Org -> Redirect to Step 1 (Bootstrap Mode)
+                    router.push("/onboardingpro/step-1-identity");
                 }
             } catch (e) {
                 console.error("Dispatcher Error:", e);
@@ -58,41 +57,11 @@ export default function OnboardingDispatcher() {
         checkState();
     }, [supabase, router]);
 
-    const handleCreateOrg = async () => {
-        setLoading(true);
-        const { data, error } = await supabase.rpc('api_v1_bootstrap_organization', {
-            p_org_name: newOrgName,
-            p_first_name: firstName,
-            p_last_name: lastName
-        });
-
-        if (error) {
-            alert("Creation Failed: " + error.message);
-            setLoading(false);
-        } else {
-            // Created! Redirect to Step 1
-            router.push("/onboardingpro/step-1");
-        }
-    };
-
+    // Loading State
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
-    if (isCreating) {
-        return (
-            <div className="p-6 space-y-8 max-w-md mx-auto mt-10 border rounded bg-slate-50 shadow-lg">
-                <h1 className="text-2xl font-bold text-center">Bienvenue sur YouCanGo Pro !</h1>
-                <p className="text-center text-gray-600">Pour commencer, créez votre organisation.</p>
-                <div className="space-y-4">
-                    <input className="border p-2 w-full rounded" placeholder="Nom de votre Entreprise (Enseigne)" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} />
-                    <div className="flex gap-2">
-                        <input className="border p-2 w-full rounded" placeholder="Votre Prénom" value={firstName} onChange={e => setFirstName(e.target.value)} />
-                        <input className="border p-2 w-full rounded" placeholder="Votre Nom" value={lastName} onChange={e => setLastName(e.target.value)} />
-                    </div>
-                    <Button onClick={handleCreateOrg} className="w-full">Créer mon Espace</Button>
-                </div>
-            </div>
-        )
-    }
-
-    return null; // Should redirect
+    // Dispatcher logic handles redirection.
+    // If we are still here (and not creating), it implies a redirection is pending or failed.
+    // But for the new "Fresh Start" flow, we simply redirect to Step 1.
+    return null;
 }
