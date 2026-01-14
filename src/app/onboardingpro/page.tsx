@@ -103,7 +103,14 @@ export default function ProOnboardingPage() {
                 await supabase.from('organizations').update({ onboarding_step: step + 1 }).eq('id', orgId);
                 setStep(step + 1);
             } else {
-                alert(`Validation incomplète : ${result.details?.join(", ") || "Vérifiez les champs requis."}`);
+                // Parse details object (e.g. { checks: { has_identity: true, ... } })
+                const checks = result.details?.checks || result.details || {};
+                const failures = Object.entries(checks)
+                    // @ts-ignore
+                    .filter(([key, val]) => val === false)
+                    .map(([key]) => key.replace('has_', '').replace('_', ' '));
+
+                alert(`Validation incomplète : ${failures.join(", ") || "Vérifiez les critères requis."}`);
             }
 
         } catch (e: any) {
