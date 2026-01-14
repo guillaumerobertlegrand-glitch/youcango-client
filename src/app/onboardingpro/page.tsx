@@ -24,28 +24,40 @@ export default function ProOnboardingPage() {
     // Initialize State
     useEffect(() => {
         async function init() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: pro } = await supabase
-                .from('professionals')
-                .select('id, role, organization_id, organization:organizations(onboarding_step, siret, official_name, ape_code)')
-                .eq('user_id', user.id)
-                .single();
-
-            if (pro) {
-                setRole(pro.role);
-                setOrgId(pro.organization_id);
-                // @ts-ignore
-                const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
-                if (org) {
-                    setStep(org.onboarding_step || 1);
-                    setSiret(org.siret || "");
-                    setOfficialName(org.official_name || "");
-                    setApeCode(org.ape_code || "");
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    setLoading(false);
+                    return;
                 }
+
+                const { data: pro, error } = await supabase
+                    .from('professionals')
+                    .select('id, role, organization_id, organization:organizations(onboarding_step, siret, official_name, ape_code)')
+                    .eq('user_id', user.id)
+                    .maybeSingle(); // Use maybeSingle to avoid throw on null
+
+                if (pro) {
+                    setRole(pro.role);
+                    setOrgId(pro.organization_id);
+                    // @ts-ignore
+                    const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
+                    if (org) {
+                        setStep(org.onboarding_step || 1);
+                        setSiret(org.siret || "");
+                        setOfficialName(org.official_name || "");
+                        setApeCode(org.ape_code || "");
+                    }
+                } else {
+                    console.log("No Pro profile found for this user.");
+                    // Optional: Redirect to a "Create Profile" or "Welcome" page if not a pro yet?
+                    // For now, just stop loading so they see *something* (or a blank form if we decide to let them create).
+                }
+            } catch (e) {
+                console.error("Init Error:", e);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         }
         init();
     }, [supabase]);
