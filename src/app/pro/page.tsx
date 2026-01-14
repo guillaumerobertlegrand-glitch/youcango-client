@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, MapPin, CheckCircle2, XCircle } from "lucide-react";
-import mapboxgl from 'mapbox-gl';
+import { createClient } from "@/utils/supabase/client";
 
 // Mock Pro & Org Data (Ideally fetched from context/backend)
 const PRO_ORG_LOCATION = { lat: 48.8566, lng: 2.3522 }; // Seed data location
@@ -14,6 +12,31 @@ export default function ProDashboard() {
     const [isOnline, setIsOnline] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
+    const [isDemoMode, setIsDemoMode] = useState(false);
+    const supabase = createClient();
+
+    // Check Onboarding Status
+    useEffect(() => {
+        async function checkStatus() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: pro } = await supabase
+                .from('professionals')
+                .select('organization:organizations(onboarding_status)')
+                .eq('user_id', user.id)
+                .single();
+
+            if (pro && pro.organization) {
+                // @ts-ignore
+                const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
+                if (org && org.onboarding_status !== 'completed') {
+                    setIsDemoMode(true);
+                }
+            }
+        }
+        checkStatus();
+    }, [supabase]);
 
     // Initial Load from LocalStorage
     useEffect(() => {
@@ -54,17 +77,6 @@ export default function ProDashboard() {
 
             // 3. Simulate Network Delay for UX
             await new Promise(r => setTimeout(r, 1500));
-
-            /*
-            // STRICT CHECK COMMENTED OUT FOR TESTING
-            if (distance <= ALLOWED_RADIUS_METERS) {
-                setIsOnline(true);
-                setStatusMessage(`Présence confirmée (${Math.round(distance)}m). Vous êtes en ligne.`);
-            } else {
-                setIsOnline(false); // Revert
-                setStatusMessage(`Trop loin du salon (${Math.round(distance)}m). Rapprochez-vous pour activer.`);
-            }
-            */
 
             // BYPASS FOR TESTING
             setIsOnline(true);
@@ -107,8 +119,16 @@ export default function ProDashboard() {
         return R * c;
     };
 
+
     return (
-        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700 bg-white">
+        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700 bg-white relative">
+
+            {/* Demo Banner */}
+            {isDemoMode && (
+                <div className="absolute top-0 w-full bg-yellow-100 text-yellow-800 text-xs font-semibold py-1 px-4 text-center border-b border-yellow-200">
+                    Mode Démo : Configuration incomplète. Données simulées.
+                </div>
+            )}
 
             {/* Status Text (Simplified) */}
             <h2 className={`text-3xl font-bold tracking-tight transition-colors duration-300 text-center ${isOnline ? 'text-green-600' : 'text-slate-400'}`}>
@@ -124,9 +144,6 @@ export default function ProDashboard() {
                     className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-slate-200"
                 />
             </div>
-
-            {/* Feedback Message Removed as requested */}
-
         </div>
     );
 }
