@@ -34,7 +34,17 @@ export default function OnboardingDispatcher() {
                     // @ts-ignore
                     const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
                     const step = org.onboarding_step || 1;
-                    router.push(`/onboardingpro/step-${step}`);
+
+                    const routes = {
+                        1: '/onboardingpro/step-1-identity',
+                        2: '/onboardingpro/step-2-finance',
+                        3: '/onboardingpro/step-3-catalog',
+                        4: '/onboardingpro/step-4-team',
+                        5: '/onboardingpro/step-5-ready'
+                    };
+
+                    // @ts-ignore
+                    router.push(routes[step] || routes[1]);
                 } else {
                     // No Org -> Show Creation Form
                     setIsCreating(true);
