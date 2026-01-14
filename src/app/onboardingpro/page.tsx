@@ -21,6 +21,12 @@ export default function ProOnboardingPage() {
     const [stripeEmail, setStripeEmail] = useState(""); // Simplified Trigger
     const [inviteEmail, setInviteEmail] = useState("");
 
+    // Create Org States
+    const [isCreating, setIsCreating] = useState(false);
+    const [newOrgName, setNewOrgName] = useState("");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+
     // Initialize State
     useEffect(() => {
         async function init() {
@@ -35,7 +41,7 @@ export default function ProOnboardingPage() {
                     .from('professionals')
                     .select('id, role, organization_id, organization:organizations(onboarding_step, siret, official_name, ape_code)')
                     .eq('user_id', user.id)
-                    .maybeSingle(); // Use maybeSingle to avoid throw on null
+                    .maybeSingle();
 
                 if (pro) {
                     setRole(pro.role);
@@ -49,9 +55,8 @@ export default function ProOnboardingPage() {
                         setApeCode(org.ape_code || "");
                     }
                 } else {
-                    console.log("No Pro profile found for this user.");
-                    // Optional: Redirect to a "Create Profile" or "Welcome" page if not a pro yet?
-                    // For now, just stop loading so they see *something* (or a blank form if we decide to let them create).
+                    console.log("No Pro profile found. User needs to create an organization.");
+                    setIsCreating(true);
                 }
             } catch (e) {
                 console.error("Init Error:", e);
@@ -61,6 +66,24 @@ export default function ProOnboardingPage() {
         }
         init();
     }, [supabase]);
+
+    const handleCreateOrg = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.rpc('api_v1_bootstrap_organization', {
+            p_org_name: newOrgName,
+            p_first_name: firstName,
+            p_last_name: lastName
+        });
+
+        if (error) {
+            alert("Creation Failed: " + error.message);
+            setLoading(false);
+        } else {
+            // success, reload page or set state manually
+            window.location.reload();
+        }
+    };
+
 
     // Validation & Next Step
     const handleNext = async () => {
@@ -77,18 +100,14 @@ export default function ProOnboardingPage() {
             if (error) throw error;
 
             if (result.valid) {
-                // 2. Logic to Advance
-                // In a real app we would update the DB state here or rely on the validator to do it (our validator is read-only).
-                // For this MVP, let's assume we proceed. 
-                // We should probably update the org step in DB to persist progress.
                 await supabase.from('organizations').update({ onboarding_step: step + 1 }).eq('id', orgId);
                 setStep(step + 1);
             } else {
-                alert(`Validation Failed: ${JSON.stringify(result.details)}`);
+                alert(`Validation incomplète : ${result.details?.join(", ") || "Vérifiez les champs requis."}`);
             }
 
         } catch (e: any) {
-            alert(e.message);
+            alert("Erreur : " + e.message);
         } finally {
             setLoading(false);
         }
@@ -110,12 +129,21 @@ export default function ProOnboardingPage() {
     // Helper: Step 1 Update Identity
     const saveIdentity = async () => {
         if (!orgId) return;
-        await supabase.from('organizations').update({
+
+        const { error } = await supabase.from('organizations').update({
             siret,
             official_name: officialName,
             ape_code: apeCode
         }).eq('id', orgId);
-        alert("Identity Saved. Check Validation.");
+
+        if (error) {
+            console.error("Save Error:", error);
+            alert("Erreur de sauvegarde : " + error.message);
+        } else {
+            // Optional: sleek toast instead of alert? For now, silence is golden or a small visual cue.
+            // But let's keep a small alert for confirmation until we have UI Toasts.
+            alert("Identité sauvegardée avec succès !");
+        }
     };
 
     // Helper: Invite Editor
@@ -131,6 +159,23 @@ export default function ProOnboardingPage() {
 
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+
+    if (isCreating) {
+        return (
+            <div className="p-6 space-y-8 max-w-md mx-auto mt-10 border rounded bg-slate-50">
+                <h1 className="text-2xl font-bold">Bienvenue sur YouCanGo Pro !</h1>
+                <p>Pour commencer, créez votre organisation.</p>
+                <div className="space-y-4">
+                    <input className="border p-2 w-full" placeholder="Nom de votre Entreprise (Enseigne)" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} />
+                    <div className="flex gap-2">
+                        <input className="border p-2 w-full" placeholder="Votre Prénom" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                        <input className="border p-2 w-full" placeholder="Votre Nom" value={lastName} onChange={e => setLastName(e.target.value)} />
+                    </div>
+                    <Button onClick={handleCreateOrg} className="w-full">Créer mon Espace</Button>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="p-6 space-y-8">
