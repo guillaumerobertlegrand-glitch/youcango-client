@@ -22,14 +22,22 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath("/", "layout");
-    redirect("/");
+    redirect("/onboardingpro");
 }
 
 export async function signup(formData: FormData) {
     const supabase = await createClient();
 
-    const email = (formData.get("email") as string).trim();
+    const rawEmail = formData.get("email") as string;
+    const email = rawEmail?.trim();
     const password = formData.get("password") as string;
+
+    // Security: Strict Regex Validation to prevent bounces
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!email || !emailRegex.test(email)) {
+        console.error("Signup Blocked: Invalid Email Format", { email: rawEmail });
+        return redirect(`/login?error=${encodeURIComponent("Adresse email invalide. Veuillez vérifier le format.")}`);
+    }
 
     const { error } = await supabase.auth.signUp({
         email,
@@ -42,9 +50,7 @@ export async function signup(formData: FormData) {
     }
 
     revalidatePath("/", "layout");
-    redirect("/?message=Check email to continue sign in process");
-    revalidatePath("/", "layout");
-    redirect("/?message=Check email to continue sign in process");
+    return redirect("/login?message=Un email de confirmation a été envoyé. Veuillez cliquer sur le lien pour continuer.");
 }
 
 export async function loginWithProvider(provider: "google" | "apple") {

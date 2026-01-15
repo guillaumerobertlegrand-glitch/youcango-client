@@ -12,10 +12,19 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { email, organization_id, first_name, last_name, role = 'editor' } = await request.json();
+        let { email, organization_id, first_name, last_name, role = 'editor' } = await request.json();
+
+        // 0. Security Sanitization
+        email = email?.trim();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
         if (!email || !organization_id) {
             return NextResponse.json({ error: "Email and Organization ID are required" }, { status: 400 });
+        }
+
+        if (!emailRegex.test(email)) {
+            console.error("Invite Blocked: Invalid Email Format", { email });
+            return NextResponse.json({ error: "Format email invalide" }, { status: 400 });
         }
 
         // 1. Verify Permission & Create DB Record (RPC)

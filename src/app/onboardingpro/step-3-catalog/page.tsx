@@ -115,8 +115,8 @@ export default function Step3CatalogPage() {
                 <div className="mt-4 pt-4 border-t grid gap-3">
                     <input className="border p-2 rounded" placeholder="Nom du service (ex: Coupe Homme)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
                     <div className="flex gap-2">
-                        <input type="number" className="border p-2 rounded w-1/2" placeholder="Durée (min)" value={newDuration} onChange={e => setNewDuration(parseInt(e.target.value))} />
-                        <input type="number" className="border p-2 rounded w-1/2" placeholder="Prix (€)" value={newPrice} onChange={e => setNewPrice(parseFloat(e.target.value))} />
+                        <input type="number" className="border p-2 rounded w-1/2" placeholder="Durée (min)" value={newDuration || ""} onChange={e => setNewDuration(parseInt(e.target.value) || 0)} />
+                        <input type="number" className="border p-2 rounded w-1/2" placeholder="Prix (€)" value={newPrice || ""} onChange={e => setNewPrice(parseFloat(e.target.value) || 0)} />
                     </div>
                     <Button onClick={addService} variant="secondary" className="w-full flex gap-2 justify-center">
                         <Plus className="w-4 h-4" /> Ajouter Service

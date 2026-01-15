@@ -48,8 +48,8 @@ export default function Step4TeamPage() {
         // AUTO-SEED: If no devices, create defaults so the user isn't stuck
         if (!devs || devs.length === 0) {
             await supabase.from('devices').insert([
-                { organization_id: oid, name: 'Caisse Principale', status: 'unused', type: 'tablet' },
-                { organization_id: oid, name: 'Tablette Mobile', status: 'unused', type: 'phone' }
+                { organization_id: oid, name: 'Caisse Principale', status: 'inactive', type: 'tablet' },
+                { organization_id: oid, name: 'Tablette Mobile', status: 'inactive', type: 'phone' }
             ]);
             const { data: newDevs } = await supabase.from('devices').select('*').eq('organization_id', oid);
             devs = newDevs;
@@ -70,7 +70,7 @@ export default function Step4TeamPage() {
 
         // 1. Ensure user is Admin (should be already)
         // 2. Find a free device (or create one if none? For now assume seeded or create dummy)
-        let deviceId = devices.find(d => d.status === 'unused')?.id;
+        let deviceId = devices.find(d => d.status === 'inactive' && !d.pro_id)?.id;
 
         // MVP Hack: specific to Demo
         if (!deviceId) {
