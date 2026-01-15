@@ -86,7 +86,20 @@ export default function Step4TeamPage() {
         const myProId = team.find(p => p.user_id === userId)?.id;
         if (myProId && deviceId) {
             await supabase.rpc('api_v1_assign_device_to_pro', { p_pro_id: myProId, p_device_id: deviceId });
-            // Also auto-authorize all services? (Skipped for MVP check, validator just checks skills existence if strict, but our validator is loose on skills for now)
+
+            // Auto-authorize all services for Admin (Solo Mode)
+            const { data: services } = await supabase.from('services').select('id').eq('organization_id', orgId);
+            if (services && services.length > 0) {
+                const auths = services.map(s => ({
+                    professional_id: myProId,
+                    service_id: s.id,
+                    authorized: true,
+                    priority: 1,
+                    skill_level: 'expert'
+                }));
+                // Use upsert to avoid duplicates if re-running
+                await supabase.from('professional_service_authorizations').upsert(auths, { onConflict: 'professional_id, service_id' });
+            }
         }
 
         proceedNext();
