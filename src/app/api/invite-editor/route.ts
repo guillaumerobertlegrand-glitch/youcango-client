@@ -53,8 +53,8 @@ export async function POST(request: Request) {
                 organization_id: organization_id,
                 first_name: first_name,
                 last_name: last_name
-            }
-            // redirectTo: 'https://youcango-app.com/pro/onboarding' // Optional
+            },
+            redirectTo: `${new URL(request.url).origin}/onboardingpro/setup-password`
         });
 
         if (authError) {

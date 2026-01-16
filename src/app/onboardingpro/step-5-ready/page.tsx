@@ -35,7 +35,19 @@ export default function Step5ReadyPage() {
         const { data, error } = await supabase.rpc('api_v1_complete_onboarding', { p_org_id: orgId });
 
         if (error || !data.success) {
-            alert("Erreur de lancement : " + (error?.message || data?.error));
+            console.error("Launch Error:", data);
+            let msg = error?.message || data?.error;
+
+            // Extract details
+            if (data?.steps) {
+                const fails = Object.entries(data.steps)
+                    .filter(([_, val]: [string, any]) => !val.valid)
+                    .map(([step, val]: [string, any]) => `Étape ${step}: ${(val as any).details ? JSON.stringify((val as any).details) : 'Invalide'}`)
+                    .join('\n');
+                if (fails) msg += `\n\n${fails}`;
+            }
+
+            alert("Erreur de lancement :\n" + msg);
             setLoading(false);
         } else {
             // Success! Redirect to Dashboard

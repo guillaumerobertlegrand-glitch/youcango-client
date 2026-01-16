@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, User, Users, Check, Smartphone } from "lucide-react";
+import { Loader2, User, Users, Check, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { signout } from "@/app/login/actions";
@@ -141,12 +141,31 @@ export default function Step4TeamPage() {
         if (orgId) fetchData(orgId);
     };
 
+    const removeMember = async (proId: string) => {
+        if (!confirm("Voulez-vous vraiment retirer ce membre de l'équipe ?")) return;
+        setLoading(true);
+        const { data, error } = await supabase.rpc('api_v1_remove_team_member', { p_pro_id: proId, p_org_id: orgId });
+        if (error || !data.success) {
+            alert("Erreur: " + (error?.message || data?.error));
+            setLoading(false);
+        } else {
+            fetchData(orgId!);
+        }
+    };
+
     const proceedNext = async () => {
         if (!orgId) return;
 
         // TEAM VALIDATION RULE
         if (mode === 'team' && team.length < 2) {
             alert("En mode Équipe, vous devez inviter au moins un collaborateur. Sinon, passez en mode Solo.");
+            return;
+        }
+
+        // DEVICE ASSIGNMENT RULE (Strict)
+        const unequipped = team.filter(member => !devices.some(d => d.pro_id === member.id && d.status === 'active'));
+        if (unequipped.length > 0) {
+            alert(`Attention : Certains membres n'ont pas de terminal assigné (${unequipped.map(m => m.first_name).join(', ')}).\n\nVeuillez leur assigner une caisse/tablette ou les retirer de l'équipe.`);
             return;
         }
 
@@ -164,6 +183,10 @@ export default function Step4TeamPage() {
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     const myPro = team.find(p => p.user_id === userId);
+    const isAdmin = myPro?.role === 'admin';
+
+    // Filter controls for non-admins
+    const canManage = isAdmin;
 
     return (
         <div className="p-6 space-y-8 max-w-3xl mx-auto">
@@ -177,16 +200,16 @@ export default function Step4TeamPage() {
             {/* Mode Toggle */}
             <div className="flex justify-center space-x-10 p-6 bg-slate-50 rounded-xl border">
                 <div
-                    onClick={() => setMode('solo')}
-                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'solo' ? 'border-blue-600 bg-blue-50' : 'border-transparent hover:bg-white'}`}
+                    onClick={() => canManage && setMode('solo')}
+                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'solo' ? 'border-blue-600 bg-blue-50' : 'border-transparent hover:bg-white'} ${!canManage ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <User className={`w-8 h-8 mb-2 ${mode === 'solo' ? 'text-blue-600' : 'text-gray-400'}`} />
                     <span className="font-semibold">Solo</span>
                     <span className="text-xs text-center text-gray-500">Je travaille seul</span>
                 </div>
                 <div
-                    onClick={() => setMode('team')}
-                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'team' ? 'border-purple-600 bg-purple-50' : 'border-transparent hover:bg-white'}`}
+                    onClick={() => canManage && setMode('team')}
+                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'team' ? 'border-purple-600 bg-purple-50' : 'border-transparent hover:bg-white'} ${!canManage ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <Users className={`w-8 h-8 mb-2 ${mode === 'team' ? 'text-purple-600' : 'text-gray-400'}`} />
                     <span className="font-semibold">Équipe</span>
@@ -214,36 +237,38 @@ export default function Step4TeamPage() {
                 <div className="border p-6 rounded bg-white shadow-sm space-y-6">
                     <h3 className="font-semibold text-lg">Gestion de l'Équipe</h3>
 
-                    {/* Invite Form */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex gap-2">
-                            <input className="border p-2 rounded flex-1" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
-                            <input className="border p-2 rounded flex-1" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
+                    {/* Invite Form (Admins Only) */}
+                    {isAdmin && (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                                <input className="border p-2 rounded flex-1" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
+                                <input className="border p-2 rounded flex-1" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
+                            </div>
+                            <div className="flex gap-2">
+                                <input className="border p-2 rounded flex-grow" placeholder="Email Collaborateur" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                                <select className="border p-2 rounded bg-white w-32" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                                    <option value="admin">Admin</option>
+                                    <option value="editor">Editor</option>
+                                    <option value="user">User</option>
+                                </select>
+                                <Button onClick={sendInvite} size="sm" disabled={!inviteEmail || !inviteFirstName || !inviteLastName}>Inviter</Button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <input className="border p-2 rounded flex-grow" placeholder="Email Collaborateur" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
-                            <select className="border p-2 rounded bg-white w-32" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                                <option value="admin">Admin</option>
-                                <option value="editor">Editor</option>
-                                <option value="staff">Staff</option>
-                            </select>
-                            <Button onClick={sendInvite} size="sm" disabled={!inviteEmail || !inviteFirstName || !inviteLastName}>Inviter</Button>
-                        </div>
-                    </div>
+                    )}
 
                     {/* Team List */}
                     <div className="space-y-4">
                         {team
-                            // Sort: Admin (UserId match) first, then alphabetical
+                            // Sort: Me first, then Admin, then others
                             .sort((a, b) => {
                                 if (a.user_id === userId) return -1;
                                 if (b.user_id === userId) return 1;
-                                return (a.first_name || '').localeCompare(b.first_name || '');
+                                return (b.role === 'admin' ? 1 : 0) - (a.role === 'admin' ? 1 : 0);
                             })
                             .map((member, index) => (
                                 <div key={member.id} className="p-4 border rounded bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center relative">
                                     {member.user_id === userId && (
-                                        <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br font-bold">MOI (ADMIN)</div>
+                                        <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br font-bold">MOI ({member.role?.toUpperCase()})</div>
                                     )}
 
                                     <div>
@@ -259,21 +284,31 @@ export default function Step4TeamPage() {
                                         </div>
                                     </div>
 
-                                    {/* Device Selector */}
-                                    <div className="flex items-center gap-2">
-                                        <Smartphone className="w-4 h-4 text-gray-500" />
-                                        <select
-                                            className="text-sm border rounded p-1 max-w-[150px]"
-                                            value={devices.find(d => d.pro_id === member.id)?.id || ""}
-                                            onChange={(e) => linkDevice(member.id, e.target.value)}
-                                        >
-                                            <option value="">Aucun Terminal</option>
-                                            {devices.map(d => (
-                                                <option key={d.id} value={d.id} disabled={d.status === 'active' && d.pro_id !== member.id}>
-                                                    {d.name} {d.status === 'active' && d.pro_id !== member.id ? '(Occupé)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="flex items-center gap-4">
+                                        {/* Device Selector */}
+                                        <div className="flex items-center gap-2">
+                                            <Smartphone className={`w-4 h-4 ${devices.some(d => d.pro_id === member.id) ? 'text-green-600' : 'text-red-400'}`} />
+                                            <select
+                                                className={`text-sm border rounded p-1 max-w-[150px] ${!devices.some(d => d.pro_id === member.id) ? 'border-red-300 bg-red-50' : ''}`}
+                                                value={devices.find(d => d.pro_id === member.id)?.id || ""}
+                                                onChange={(e) => linkDevice(member.id, e.target.value)}
+                                                disabled={!isAdmin}
+                                            >
+                                                <option value="">Aucun Terminal</option>
+                                                {devices.map(d => (
+                                                    <option key={d.id} value={d.id} disabled={d.status === 'active' && d.pro_id !== member.id}>
+                                                        {d.name} {d.status === 'active' && d.pro_id !== member.id ? '(Occupé)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Remove Button (Only for Admins, removing others) */}
+                                        {isAdmin && member.user_id !== userId && (
+                                            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-red-600" onClick={() => removeMember(member.id)}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -281,9 +316,18 @@ export default function Step4TeamPage() {
                 </div>
             )}
 
-            <Button onClick={mode === 'solo' ? handleSoloSetup : proceedNext} className="w-full">
-                {mode === 'solo' ? "Configurer & Terminer" : "Valider & Suivant"}
-            </Button>
+            <div className="space-y-4">
+                <Button onClick={mode === 'solo' ? handleSoloSetup : proceedNext} className="w-full" disabled={!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id))}>
+                    {mode === 'solo' ? "Configurer & Terminer" : "Valider & Suivant"}
+                </Button>
+
+                {!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id)) && (
+                    <p className="text-center text-red-500 text-sm">
+                        En attente de l'administrateur : Certains membres n'ont pas de terminal.
+                        <br />Veuillez contacter l'admin pour finaliser la configuration.
+                    </p>
+                )}
+            </div>
         </div>
     );
 }
