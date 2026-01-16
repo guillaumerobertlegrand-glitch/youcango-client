@@ -213,10 +213,12 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     const lowerCat = (cat || '').toLowerCase();
 
                     // Explicit Mappings (Align with DB)
-                    if (['restaurant', 'bakery', 'grocery', 'florist', 'bookstore', 'mechanic', 'electronics'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
+                    // REMOVED 'restaurant' from merchant list as they are now services
+                    if (['bakery', 'grocery', 'florist', 'bookstore', 'electronics'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
                         return 'merchant';
                     }
-                    if (['hairdresser', 'barber', 'beauty_salon', 'doctor', 'plumber', 'taxi'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
+                    // ADDED 'restaurant', 'mechanic' to service list
+                    if (['restaurant', 'hairdresser', 'barber', 'beauty_salon', 'doctor', 'plumber', 'taxi', 'mechanic', 'garage'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
                         return 'service';
                     }
                     return cat || null; // Fallback to what AI said
