@@ -24,6 +24,9 @@ export default function Step4TeamPage() {
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState("editor");
 
+    const [inviteFirstName, setInviteFirstName] = useState("");
+    const [inviteLastName, setInviteLastName] = useState("");
+
     useEffect(() => {
         async function init() {
             const { data: { user } } = await supabase.auth.getUser();
@@ -42,6 +45,8 @@ export default function Step4TeamPage() {
     }, [router, supabase]);
 
     const fetchData = async (oid: string) => {
+        // Fetch Pros and joined Emails if possible (auth users table not accessible directly usually, so rely on pro table fields or generic joins)
+        // Here assuming pro table has basic info.
         const { data: pros } = await supabase.from('professionals').select('*, devices(*)').eq('organization_id', oid);
         let { data: devs } = await supabase.from('devices').select('*').eq('organization_id', oid);
 
@@ -77,7 +82,7 @@ export default function Step4TeamPage() {
             const { data: newDev } = await supabase.from('devices').insert({
                 organization_id: orgId,
                 name: 'Mon Tablette',
-                status: 'unused'
+                status: 'inactive' // Fixed from unused
             }).select().single();
             if (newDev) deviceId = newDev.id;
         }
@@ -107,13 +112,24 @@ export default function Step4TeamPage() {
 
     const sendInvite = async () => {
         if (!orgId) return;
+        setLoading(true);
+        // Note: The API route needs to better handle first/last name
         const res = await fetch('/api/invite-editor', {
             method: 'POST',
-            body: JSON.stringify({ email: inviteEmail, organization_id: orgId, role: inviteRole })
+            body: JSON.stringify({
+                email: inviteEmail,
+                organization_id: orgId,
+                role: inviteRole,
+                first_name: inviteFirstName,
+                last_name: inviteLastName
+            })
         });
         const json = await res.json();
+        setLoading(false);
         if (json.success) {
             setInviteEmail("");
+            setInviteFirstName("");
+            setInviteLastName("");
             fetchData(orgId);
         } else {
             alert(json.error);
@@ -127,6 +143,12 @@ export default function Step4TeamPage() {
 
     const proceedNext = async () => {
         if (!orgId) return;
+
+        // TEAM VALIDATION RULE
+        if (mode === 'team' && team.length < 2) {
+            alert("En mode Équipe, vous devez inviter au moins un collaborateur. Sinon, passez en mode Solo.");
+            return;
+        }
 
         const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
         if (result.valid) {
@@ -193,46 +215,68 @@ export default function Step4TeamPage() {
                     <h3 className="font-semibold text-lg">Gestion de l'Équipe</h3>
 
                     {/* Invite Form */}
-                    <div className="flex gap-2">
-                        <input className="border p-2 rounded flex-grow" placeholder="Email Collaborateur" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
-                        <select className="border p-2 rounded bg-white" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                            <option value="admin">Admin</option>
-                            <option value="editor">Editor</option>
-                            <option value="user">User</option>
-                        </select>
-                        <Button onClick={sendInvite} size="sm">Inviter</Button>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                            <input className="border p-2 rounded flex-1" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
+                            <input className="border p-2 rounded flex-1" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
+                        </div>
+                        <div className="flex gap-2">
+                            <input className="border p-2 rounded flex-grow" placeholder="Email Collaborateur" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                            <select className="border p-2 rounded bg-white w-32" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                                <option value="admin">Admin</option>
+                                <option value="editor">Editor</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                            <Button onClick={sendInvite} size="sm" disabled={!inviteEmail || !inviteFirstName || !inviteLastName}>Inviter</Button>
+                        </div>
                     </div>
 
                     {/* Team List */}
                     <div className="space-y-4">
-                        {team.map((member) => (
-                            <div key={member.id} className="p-4 border rounded bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center">
-                                <div>
-                                    <p className="font-medium">{member.first_name || 'Invité'} {member.last_name} <span className="text-gray-400 text-xs">({member.email})</span></p>
-                                    <div className="flex gap-2 mt-1">
-                                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{member.role}</span>
-                                        <span className="text-xs px-2 py-0.5 bg-gray-200 text-gray-700 rounded">{member.status}</span>
+                        {team
+                            // Sort: Admin (UserId match) first, then alphabetical
+                            .sort((a, b) => {
+                                if (a.user_id === userId) return -1;
+                                if (b.user_id === userId) return 1;
+                                return (a.first_name || '').localeCompare(b.first_name || '');
+                            })
+                            .map((member, index) => (
+                                <div key={member.id} className="p-4 border rounded bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center relative">
+                                    {member.user_id === userId && (
+                                        <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br font-bold">MOI (ADMIN)</div>
+                                    )}
+
+                                    <div>
+                                        <p className="font-medium mt-1">{member.first_name} {member.last_name || ''}
+                                            {member.job_title && <span className="text-gray-500 text-sm font-normal"> - {member.job_title}</span>}
+                                        </p>
+                                        <p className="text-gray-400 text-xs">{member.email || 'Email non renseigné'}</p>
+                                        <div className="flex gap-2 mt-1">
+                                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{member.role}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded ${member.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                                                {member.status}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Device Selector */}
+                                    <div className="flex items-center gap-2">
+                                        <Smartphone className="w-4 h-4 text-gray-500" />
+                                        <select
+                                            className="text-sm border rounded p-1 max-w-[150px]"
+                                            value={devices.find(d => d.pro_id === member.id)?.id || ""}
+                                            onChange={(e) => linkDevice(member.id, e.target.value)}
+                                        >
+                                            <option value="">Aucun Terminal</option>
+                                            {devices.map(d => (
+                                                <option key={d.id} value={d.id} disabled={d.status === 'active' && d.pro_id !== member.id}>
+                                                    {d.name} {d.status === 'active' && d.pro_id !== member.id ? '(Occupé)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
-
-                                {/* Device Selector */}
-                                <div className="flex items-center gap-2">
-                                    <Smartphone className="w-4 h-4 text-gray-500" />
-                                    <select
-                                        className="text-sm border rounded p-1"
-                                        value={devices.find(d => d.pro_id === member.id)?.id || ""}
-                                        onChange={(e) => linkDevice(member.id, e.target.value)}
-                                    >
-                                        <option value="">Aucun Terminal</option>
-                                        {devices.map(d => (
-                                            <option key={d.id} value={d.id} disabled={d.status === 'active' && d.pro_id !== member.id}>
-                                                {d.name} {d.status === 'active' && d.pro_id !== member.id ? '(Occupé)' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
                     </div>
                 </div>
             )}

@@ -14,7 +14,6 @@ export default function Step1IdentityPage() {
     // State
     const [mode, setMode] = useState<'create' | 'update'>('create');
     const [orgId, setOrgId] = useState<string | null>(null);
-    const [userProfile, setUserProfile] = useState<{ first: string, last: string } | null>(null);
 
     // Identity Form
     const [siret, setSiret] = useState("");
@@ -29,6 +28,11 @@ export default function Step1IdentityPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
 
+    // Pro Profile State
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [jobTitle, setJobTitle] = useState("");
+
     // Initialization
     useEffect(() => {
         async function init() {
@@ -39,12 +43,15 @@ export default function Step1IdentityPage() {
 
                 // Get User Profile (for bootstrap)
                 const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
-                if (profile) setUserProfile({ first: profile.first_name || '', last: profile.last_name || '' });
+                if (profile) {
+                    setFirstName(profile.first_name || '');
+                    setLastName(profile.last_name || '');
+                }
 
                 // Get Pro & Org
                 const { data: pro } = await supabase
                     .from('professionals')
-                    .select('organization_id, organization:organizations(id, siret, official_name, ape_code)')
+                    .select('organization_id, job_title, organization:organizations(id, siret, official_name, ape_code)')
                     .eq('user_id', user.id)
                     .maybeSingle();
 
@@ -56,6 +63,8 @@ export default function Step1IdentityPage() {
                     setSiret(org.siret || "");
                     setOfficialName(org.official_name || "");
                     setApeCode(org.ape_code || "");
+                    // Pre-fill existing pro data
+                    setJobTitle(pro.job_title || "");
                 } else {
                     setMode('create'); // No org found -> Creation Mode
                 }
@@ -85,8 +94,13 @@ export default function Step1IdentityPage() {
             const data = await response.json();
             if (data.results && data.results.length > 0) {
                 const result = data.results[0];
-                setOfficialName(result.nom_complet || "");
+                const cleanOfficialName = result.nom_complet || "";
+                setOfficialName(cleanOfficialName);
                 setApeCode(result.activite_principale || "");
+
+                // Auto-fill Name/Surname from Official Name if it looks like a person's name (common for solo entrepreneurs)
+                // Heuristic: If official name contains space and user profile is empty (edge case)
+                // But generally relying on user profile is better.
 
                 // Capture Location
                 setAddress(result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue");
@@ -162,22 +176,20 @@ export default function Step1IdentityPage() {
             return;
         }
 
-
-
-        // ... (inside searchSiret)
-        // const result = data.results[0];
-        // setOfficialName(result.nom_complet || "");
-        // setApeCode(result.activite_principale || "");
-        // setAddress(result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue");
-        // if (result.siege?.latitude) setLat(parseFloat(result.siege.latitude));
-        // if (result.siege?.longitude) setLong(parseFloat(result.siege.longitude));
+        // 1.6 Validate Profile Fields
+        if (!firstName || !lastName || !jobTitle) {
+            alert("Veuillez remplir votre profil (Prénom, Nom, Fonction).");
+            setLoading(false);
+            return;
+        }
 
         // 2. CREATE (Bootstrap)
         if (mode === 'create') {
             const { data, error } = await supabase.rpc('api_v1_bootstrap_organization', {
                 p_org_name: officialName,
-                p_first_name: userProfile?.first || 'Admin',
-                p_last_name: userProfile?.last || 'User',
+                p_first_name: firstName,
+                p_last_name: lastName,
+                p_job_title: jobTitle,
                 p_siret: siret,
                 p_official_name: officialName,
                 p_ape_code: apeCode,
@@ -197,18 +209,29 @@ export default function Step1IdentityPage() {
             await validateStep(newOrgId);
 
         } else {
-            // 3. UPDATE (Existing) - We don't update specialty here for now, only identity
+            // 3. UPDATE (Existing)
             if (!orgId) return;
-            const { error } = await supabase.from('organizations').update({
+            const { error: orgError } = await supabase.from('organizations').update({
                 siret,
                 official_name: officialName,
                 ape_code: apeCode
             }).eq('id', orgId);
 
-            if (error) {
-                alert("Erreur Update: " + error.message);
+            if (orgError) {
+                alert("Erreur Update Org: " + orgError.message);
                 setLoading(false);
                 return;
+            }
+
+            // Also update Pro Profile on edit
+            const { error: proError } = await supabase.from('professionals').update({
+                first_name: firstName,
+                last_name: lastName,
+                job_title: jobTitle
+            }).eq('organization_id', orgId).eq('role', 'admin'); // Assuming current user is admin
+
+            if (proError) {
+                console.error("Pro Update Error", proError);
             }
 
             await validateStep(orgId);
@@ -239,7 +262,7 @@ export default function Step1IdentityPage() {
             </h1>
             <p className="text-gray-500">
                 {mode === 'create'
-                    ? "Pour commencer, identifiez votre établissement grâce à votre numéro SIRET."
+                    ? "Pour commencer, identifiez votre établissement et vous-même."
                     : "Vérifiez les informations légales de votre entreprise."}
             </p>
 
@@ -262,7 +285,7 @@ export default function Step1IdentityPage() {
                 </div>
                 {searchError && <p className="text-red-500 text-sm">{searchError}</p>}
 
-                {/* Results Block */}
+                {/* Results Block (Compagny) */}
                 <div className="grid gap-4 bg-slate-50 p-4 rounded">
                     <div>
                         <label className="block text-sm font-medium mb-1 text-slate-600">Raison Sociale (Auto)</label>
@@ -280,9 +303,40 @@ export default function Step1IdentityPage() {
                     </div>
                 </div>
 
+                {/* Profile Fields (Required) */}
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium mb-1">Prénom</label>
+                        <input
+                            className="border p-2 rounded w-full"
+                            value={firstName}
+                            onChange={e => setFirstName(e.target.value)}
+                            placeholder="Jean"
+                        />
+                    </div>
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium mb-1">Nom</label>
+                        <input
+                            className="border p-2 rounded w-full"
+                            value={lastName}
+                            onChange={e => setLastName(e.target.value)}
+                            placeholder="Dupont"
+                        />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-sm font-medium mb-1">Fonction / Rôle</label>
+                        <input
+                            className="border p-2 rounded w-full"
+                            value={jobTitle}
+                            onChange={e => setJobTitle(e.target.value)}
+                            placeholder="Ex: Gérant, Directeur technique, Chef d'atelier..."
+                        />
+                    </div>
+                </div>
+
                 {/* Specialty Selector (Step 1.5) */}
                 {specialties.length > 0 && (
-                    <div className="animate-in fade-in slide-in-from-top-4">
+                    <div className="animate-in fade-in slide-in-from-top-4 pt-4 border-t">
                         <label className="block text-sm font-medium mb-1">Quelle est votre spécialité ?</label>
                         <select
                             className="border p-2 rounded w-full bg-white"
@@ -302,7 +356,7 @@ export default function Step1IdentityPage() {
 
             </div>
 
-            <Button onClick={handleNext} className="w-full" size="lg" disabled={!officialName || !isValidApe(apeCode)}>
+            <Button onClick={handleNext} className="w-full" size="lg" disabled={!officialName || !isValidApe(apeCode) || !firstName || !lastName || !jobTitle}>
                 {mode === 'create' ? "Créer mon Espace & Continuer" : "Valider & Suivant"}
             </Button>
         </div>
