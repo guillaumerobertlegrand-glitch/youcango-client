@@ -169,7 +169,7 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                 ) : (
                     <div className="flex flex-col h-full w-full">
                         {/* MapWrapper - Fixed Height (Upper Part) */}
-                        <div className="h-[55vh] flex-shrink-0 relative w-full border-b border-slate-200">
+                        <div className="h-[48vh] flex-shrink-0 relative w-full border-b border-slate-200">
                             <MapWrapper
                                 ref={mapRef}
                                 intentData={intentData}

@@ -20,6 +20,10 @@ export default function Step1IdentityPage() {
     const [siret, setSiret] = useState("");
     const [officialName, setOfficialName] = useState("");
     const [apeCode, setApeCode] = useState("");
+    // Location Data
+    const [address, setAddress] = useState("Adresse inconnue");
+    const [lat, setLat] = useState<number>(48.8566);
+    const [long, setLong] = useState<number>(2.3522);
 
     // API Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -83,6 +87,12 @@ export default function Step1IdentityPage() {
                 const result = data.results[0];
                 setOfficialName(result.nom_complet || "");
                 setApeCode(result.activite_principale || "");
+
+                // Capture Location
+                setAddress(result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue");
+                if (result.siege?.latitude) setLat(parseFloat(result.siege.latitude));
+                if (result.siege?.longitude) setLong(parseFloat(result.siege.longitude));
+
                 setSearchError(null);
             } else {
                 setSearchError("Aucune entreprise trouvée.");
@@ -105,6 +115,36 @@ export default function Step1IdentityPage() {
         return false;
     };
 
+    // Specialty Logic
+    const [specialties, setSpecialties] = useState<any[]>([]);
+    const [selectedSpecialty, setSelectedSpecialty] = useState<string>("");
+
+    useEffect(() => {
+        if (!apeCode) return;
+        // Search by APE prefix (e.g. '56' matches '56.10A')
+        // We try exact match first, then 2 digits.
+        async function loadSpecialties() {
+            // Find finding the industry prefix.
+            // Simplified logic: Check if APE starts with '56', '9602A', etc.
+            let prefix = "";
+            const cleanApe = apeCode.replace('.', '').toUpperCase();
+
+            if (cleanApe.startsWith('56')) prefix = '56';
+            else if (cleanApe.startsWith('4520')) prefix = '4520';
+            else if (cleanApe === '9602A') prefix = '9602A';
+            else if (cleanApe === '9602B') prefix = '9602B';
+
+            if (prefix) {
+                const { data } = await supabase.from('config_specialties').select('id, label').eq('industry_prefix', prefix);
+                setSpecialties(data || []);
+            } else {
+                setSpecialties([]);
+            }
+        }
+        loadSpecialties();
+    }, [apeCode, supabase]);
+
+
     const handleNext = async () => {
         setLoading(true);
 
@@ -115,15 +155,36 @@ export default function Step1IdentityPage() {
             return;
         }
 
+        // 1.5 Validate Specialty (Required if options available)
+        if (specialties.length > 0 && !selectedSpecialty) {
+            alert("Veuillez sélectionner votre spécialité.");
+            setLoading(false);
+            return;
+        }
+
+
+
+        // ... (inside searchSiret)
+        // const result = data.results[0];
+        // setOfficialName(result.nom_complet || "");
+        // setApeCode(result.activite_principale || "");
+        // setAddress(result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue");
+        // if (result.siege?.latitude) setLat(parseFloat(result.siege.latitude));
+        // if (result.siege?.longitude) setLong(parseFloat(result.siege.longitude));
+
         // 2. CREATE (Bootstrap)
         if (mode === 'create') {
             const { data, error } = await supabase.rpc('api_v1_bootstrap_organization', {
-                p_org_name: officialName, // Use official name as provisional name
+                p_org_name: officialName,
                 p_first_name: userProfile?.first || 'Admin',
                 p_last_name: userProfile?.last || 'User',
                 p_siret: siret,
                 p_official_name: officialName,
-                p_ape_code: apeCode
+                p_ape_code: apeCode,
+                p_specialty_id: selectedSpecialty || null,
+                p_address: address, // Pass Captured
+                p_lat: lat,         // Pass Captured
+                p_long: long        // Pass Captured
             });
 
             if (error) {
@@ -132,15 +193,11 @@ export default function Step1IdentityPage() {
                 return;
             }
 
-            // Success -> Org Created -> Step 1 Valid by definition (RPC sets it to 1, we validate to move to 2)
-            // But wait, the RPC sets step to 1. We need to validate Step 1 to move to 2.
             const newOrgId = data.organization_id;
-
-            // Validate Step 1 (Move to 2)
             await validateStep(newOrgId);
 
         } else {
-            // 3. UPDATE (Existing)
+            // 3. UPDATE (Existing) - We don't update specialty here for now, only identity
             if (!orgId) return;
             const { error } = await supabase.from('organizations').update({
                 siret,
@@ -222,6 +279,27 @@ export default function Step1IdentityPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Specialty Selector (Step 1.5) */}
+                {specialties.length > 0 && (
+                    <div className="animate-in fade-in slide-in-from-top-4">
+                        <label className="block text-sm font-medium mb-1">Quelle est votre spécialité ?</label>
+                        <select
+                            className="border p-2 rounded w-full bg-white"
+                            value={selectedSpecialty}
+                            onChange={e => setSelectedSpecialty(e.target.value)}
+                        >
+                            <option value="">Sélectionnez une option...</option>
+                            {specialties.map(s => (
+                                <option key={s.id} value={s.id}>{s.label}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Cela nous permet de pré-configurer votre catalogue de services.
+                        </p>
+                    </div>
+                )}
+
             </div>
 
             <Button onClick={handleNext} className="w-full" size="lg" disabled={!officialName || !isValidApe(apeCode)}>

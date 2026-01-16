@@ -25,6 +25,7 @@ interface Store {
     location_id: string; // Needed for Session creation
     phone?: string;
     image_url?: string;
+    specialty_label?: string; // NEW
 }
 
 interface MapWrapperProps {
@@ -166,14 +167,11 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
         const requestId = Math.random().toString(36).substring(7);
 
         const fetchMerchants = async () => {
-            if (!intentData?.category) {
-                onLoadingChange?.(false);
-                return;
-            }
+            // Default to showing EVERYTHING if no intent (e.g. debug or direct access)
 
             const lat = userLocation?.lat || PARIS_FALLBACK.lat;
             const long = userLocation?.long || PARIS_FALLBACK.long;
-            const currentParams = `${intentData.category}-${JSON.stringify(intentData.keywords)}-${lat.toFixed(3)}-${long.toFixed(3)}`;
+            const currentParams = `${intentData?.category}-${JSON.stringify(intentData?.keywords)}-${lat.toFixed(3)}-${long.toFixed(3)}`;
 
             const safetyUnlock = setTimeout(() => {
                 if (isEffectAlive) {
@@ -190,21 +188,21 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
             activeRequestsRef.current += 1;
             onLoadingChange?.(true);
 
-            console.log("[MapWrapper] Fetching merchants...", { lat, long, category: intentData.category, keywords: intentData.keywords });
+            console.log("[MapWrapper] Fetching merchants...", { lat, long, category: intentData?.category, keywords: intentData?.keywords });
 
             try {
                 const viewerId = getOrCreateAnonymousId();
                 // Combine keywords, category, AND extracted_category for broader search
-                const searchKeywords = [...(intentData.keywords || [])];
+                const searchKeywords = [...(intentData?.keywords || [])];
 
                 // Add the high-level type (e.g. 'service') if not present
-                if (intentData.category && !searchKeywords.includes(intentData.category)) {
+                if (intentData?.category && !searchKeywords.includes(intentData.category)) {
                     searchKeywords.push(intentData.category);
                 }
 
                 // CRITICAL: Add the specific extracted type (e.g. 'restaurant') 
                 // This ensures "Table for 2" (kw='table') matches DB Category 'restaurant'
-                if (intentData.extracted_category && !searchKeywords.includes(intentData.extracted_category)) {
+                if (intentData?.extracted_category && !searchKeywords.includes(intentData.extracted_category)) {
                     searchKeywords.push(intentData.extracted_category);
                 }
 
@@ -224,7 +222,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     return cat || null; // Fallback to what AI said
                 };
 
-                const refinedBusinessType = getBusinessType(intentData.category, intentData.extracted_category);
+                const refinedBusinessType = getBusinessType(intentData?.category, intentData?.extracted_category);
 
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
@@ -232,7 +230,7 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                     p_category: refinedBusinessType, // Use refined type
                     p_keywords: searchKeywords,
                     p_radius_meters: 5000,
-                    p_viewer_id: viewerId // Pass identity for Cooldown filtering
+                    p_viewer_id: viewerId
                 });
 
                 const timeoutPromise = new Promise((_, reject) =>
@@ -795,6 +793,14 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                                         {/* Anonymized Name until Revealed */}
                                         {isRevealed ? store.name : (store.category || store.business_type).replace('_', ' ')}
                                     </span>
+
+                                    {/* Specialty Label (For Restaurants etc) */}
+                                    {store.specialty_label && (
+                                        <span className="text-[11px] font-semibold text-blue-600 leading-none mb-0.5 animate-in fade-in">
+                                            {store.specialty_label}
+                                        </span>
+                                    )}
+
                                     <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
                                         {/* Subtitle: C2 = Distance only. C3 = Category + Distance */}
                                         {isRevealed ? `${store.category || store.business_type} • ` : ''}{store.dist_meters ? `${Math.round(store.dist_meters)}m` : 'Proche'}
