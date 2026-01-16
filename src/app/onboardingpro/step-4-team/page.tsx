@@ -142,15 +142,21 @@ export default function Step4TeamPage() {
         // Even if I setDevices, 'devices' const in scope is old.
 
         // I'll call the validation RPC directly here to decide.
-        const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
-        if (result.valid) {
-            await supabase.from('organizations').update({ onboarding_step: 5 }).eq('id', orgId);
-            router.push("/onboardingpro/step-5-ready");
+        // For Solo: We skip Step 5 (Skills) visually, but we must ensure it passes validation.
+        // Since we upserted authorizations above, S5 validation (check if auths exist) should pass.
+
+        // Check Step 4 first
+        const { data: v4 } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
+        // Check Step 5 (implicit for Solo)
+        const { data: v5 } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 5, p_org_id: orgId });
+
+        if (v4.valid && v5.valid) {
+            // Updated to Step 6 (Ready)
+            await supabase.from('organizations').update({ onboarding_step: 6 }).eq('id', orgId);
+            router.push("/onboardingpro/step-6-ready");
             return;
         } else {
-            // If invalid (likely timing), just alert?
-            // Actually, if we just awaited assign_device_type, it SHOULD be valid immediately.
-            alert("Configuration appliquée. Veuillez cliquer une seconde fois pour valider.");
+            alert("Configuration appliquée. Veuillez vérifier.");
             setLoading(false);
         }
     };
@@ -213,8 +219,9 @@ export default function Step4TeamPage() {
 
         const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
         if (result.valid) {
+            // Team Mode -> Go to Step 5 (Skills)
             await supabase.from('organizations').update({ onboarding_step: 5 }).eq('id', orgId);
-            router.push("/onboardingpro/step-5-ready");
+            router.push("/onboardingpro/step-5-skills");
         } else {
             alert("Validation incomplète : " + JSON.stringify(result.details));
             setLoading(false);

@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 
 interface Service {
     id: string;
-    title: string;
+    designation: string;
     duration_min: number;
     price_amount: number;
     active: boolean;
@@ -23,7 +23,7 @@ export default function ProServicesPage() {
     // Form State
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
-    const [formTitle, setFormTitle] = useState("");
+    const [formDesignation, setFormDesignation] = useState("");
     const [formPrice, setFormPrice] = useState("");
     const [formDuration, setFormDuration] = useState("");
 
@@ -43,7 +43,7 @@ export default function ProServicesPage() {
                 .select('*')
                 .eq('organization_id', orgs[0].id)
                 .eq('active', true)
-                .order('title');
+                .order('designation');
 
             if (svcs) setServices(svcs);
         }
@@ -52,7 +52,7 @@ export default function ProServicesPage() {
 
     const handleEdit = (svc: Service) => {
         setEditId(svc.id);
-        setFormTitle(svc.title);
+        setFormDesignation(svc.designation);
         setFormPrice(svc.price_amount?.toString() || "");
         setFormDuration(svc.duration_min?.toString() || "");
         setIsEditing(true);
@@ -60,7 +60,7 @@ export default function ProServicesPage() {
 
     const handleNew = () => {
         setEditId(null);
-        setFormTitle("");
+        setFormDesignation("");
         setFormPrice("");
         setFormDuration("");
         setIsEditing(true);
@@ -73,13 +73,13 @@ export default function ProServicesPage() {
 
     const handleSave = async () => {
         if (!orgId) return;
-        if (!formTitle || !formPrice || !formDuration) {
+        if (!formDesignation || !formPrice || !formDuration) {
             alert("Please fill all fields");
             return;
         }
 
         const payload = {
-            title: formTitle,
+            designation: formDesignation,
             price_amount: parseFloat(formPrice),
             duration_min: parseInt(formDuration),
             duration_max: parseInt(formDuration), // Simple fixed duration for now
@@ -142,8 +142,8 @@ export default function ProServicesPage() {
 
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase text-slate-400">Title</label>
-                            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="e.g. Men's Haircut" />
+                            <label className="text-xs font-bold uppercase text-slate-400">Designation</label>
+                            <Input value={formDesignation} onChange={(e) => setFormDesignation(e.target.value)} placeholder="e.g. Men's Haircut" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -174,7 +174,7 @@ export default function ProServicesPage() {
                     {services.map((svc) => (
                         <div key={svc.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-slate-300 transition-colors">
                             <div>
-                                <h3 className="font-bold text-slate-800">{svc.title}</h3>
+                                <h3 className="font-bold text-slate-800">{svc.designation}</h3>
                                 <div className="text-xs text-slate-400 font-medium">
                                     {svc.duration_min} min • <span className="text-slate-900">{svc.price_amount}€</span>
                                 </div>
