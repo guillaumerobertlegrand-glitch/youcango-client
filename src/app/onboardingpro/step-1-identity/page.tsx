@@ -18,7 +18,9 @@ export default function Step1IdentityPage() {
     // Identity Form
     const [siret, setSiret] = useState("");
     const [officialName, setOfficialName] = useState("");
+    const [commercialName, setCommercialName] = useState(""); // Linked to organizations.name
     const [apeCode, setApeCode] = useState("");
+
     // Location Data
     const [address, setAddress] = useState("Adresse inconnue");
     const [lat, setLat] = useState<number>(48.8566);
@@ -27,6 +29,10 @@ export default function Step1IdentityPage() {
     // API Search State
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+
+    // Google Places State
+    const [googleData, setGoogleData] = useState<any>(null);
+    const [enrichmentConfirmed, setEnrichmentConfirmed] = useState(false);
 
     // Pro Profile State
     const [firstName, setFirstName] = useState("");
@@ -51,7 +57,7 @@ export default function Step1IdentityPage() {
                 // Get Pro & Org
                 const { data: pro } = await supabase
                     .from('professionals')
-                    .select('organization_id, job_title, organization:organizations(id, siret, official_name, ape_code)')
+                    .select('organization_id, job_title, organization:organizations(id, siret, official_name, name, ape_code)')
                     .eq('user_id', user.id)
                     .maybeSingle();
 
@@ -62,6 +68,7 @@ export default function Step1IdentityPage() {
                     const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
                     setSiret(org.siret || "");
                     setOfficialName(org.official_name || "");
+                    setCommercialName(org.name || org.official_name || ""); // Load Name
                     setApeCode(org.ape_code || "");
                     // Pre-fill existing pro data
                     setJobTitle(pro.job_title || "");
@@ -77,6 +84,23 @@ export default function Step1IdentityPage() {
         init();
     }, [router, supabase]);
 
+    // Google Places Search
+    const searchGooglePlace = async (query: string) => {
+        try {
+            const res = await fetch('/api/google-places', {
+                method: 'POST',
+                body: JSON.stringify({ query }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.found) {
+                setGoogleData(data);
+            }
+        } catch (e) {
+            console.error("Google Search Failed", e);
+        }
+    };
+
     // Data.gouv.fr Search
     const searchSiret = async () => {
         if (siret.length < 9) {
@@ -85,6 +109,8 @@ export default function Step1IdentityPage() {
         }
         setIsSearching(true);
         setSearchError(null);
+        setGoogleData(null);
+        setEnrichmentConfirmed(false);
 
         try {
             // Search API
@@ -95,19 +121,31 @@ export default function Step1IdentityPage() {
             if (data.results && data.results.length > 0) {
                 const result = data.results[0];
                 const cleanOfficialName = result.nom_complet || "";
+
                 setOfficialName(cleanOfficialName);
+                if (!commercialName) setCommercialName(cleanOfficialName); // Pre-fill if empty
                 setApeCode(result.activite_principale || "");
 
-                // Auto-fill Name/Surname from Official Name if it looks like a person's name (common for solo entrepreneurs)
-                // Heuristic: If official name contains space and user profile is empty (edge case)
-                // But generally relying on user profile is better.
-
                 // Capture Location
-                setAddress(result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue");
-                if (result.siege?.latitude) setLat(parseFloat(result.siege.latitude));
-                if (result.siege?.longitude) setLong(parseFloat(result.siege.longitude));
+                const rawAddress = result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue";
+                setAddress(rawAddress);
+
+                let foundLat = 48.8566;
+                let foundLong = 2.3522;
+                if (result.siege?.latitude) {
+                    foundLat = parseFloat(result.siege.latitude);
+                    setLat(foundLat);
+                }
+                if (result.siege?.longitude) {
+                    foundLong = parseFloat(result.siege.longitude);
+                    setLong(foundLong);
+                }
 
                 setSearchError(null);
+
+                // ZERO FRICTION: Trigger Google Search
+                const queryName = commercialName || cleanOfficialName;
+                searchGooglePlace(`${queryName} ${rawAddress}`);
             } else {
                 setSearchError("Aucune entreprise trouvée.");
             }
@@ -122,42 +160,13 @@ export default function Step1IdentityPage() {
     // Validation Logic
     const isValidApe = (code: string) => {
         const c = code.replace('.', '').toUpperCase();
+        if (code.length === 0) return true; // Empty is valid before check
         // Whitelist: 56*, 4520*, 9602A, 9602B
         if (c.startsWith('56')) return true; // Restaurants
         if (c.startsWith('4520')) return true; // Garages
         if (c === '9602A' || c === '9602B') return true; // Coiffure / Beauté
         return false;
     };
-
-    // Specialty Logic
-    const [specialties, setSpecialties] = useState<any[]>([]);
-    const [selectedSpecialty, setSelectedSpecialty] = useState<string>("");
-
-    useEffect(() => {
-        if (!apeCode) return;
-        // Search by APE prefix (e.g. '56' matches '56.10A')
-        // We try exact match first, then 2 digits.
-        async function loadSpecialties() {
-            // Find finding the industry prefix.
-            // Simplified logic: Check if APE starts with '56', '9602A', etc.
-            let prefix = "";
-            const cleanApe = apeCode.replace('.', '').toUpperCase();
-
-            if (cleanApe.startsWith('56')) prefix = '56';
-            else if (cleanApe.startsWith('4520')) prefix = '4520';
-            else if (cleanApe === '9602A') prefix = '9602A';
-            else if (cleanApe === '9602B') prefix = '9602B';
-
-            if (prefix) {
-                const { data } = await supabase.from('config_specialties').select('id, label').eq('industry_prefix', prefix);
-                setSpecialties(data || []);
-            } else {
-                setSpecialties([]);
-            }
-        }
-        loadSpecialties();
-    }, [apeCode, supabase]);
-
 
     const handleNext = async () => {
         setLoading(true);
@@ -169,35 +178,34 @@ export default function Step1IdentityPage() {
             return;
         }
 
-        // 1.5 Validate Specialty (Required if options available)
-        if (specialties.length > 0 && !selectedSpecialty) {
-            alert("Veuillez sélectionner votre spécialité.");
-            setLoading(false);
-            return;
-        }
-
         // 1.6 Validate Profile Fields
-        if (!firstName || !lastName || !jobTitle) {
-            alert("Veuillez remplir votre profil (Prénom, Nom, Fonction).");
+        if (!firstName || !lastName || !jobTitle || !commercialName) {
+            alert("Veuillez remplir toutes les informations (Nom commercial, Profil).");
             setLoading(false);
             return;
         }
 
-        // 2. CREATE (Bootstrap)
+        // 2. CREATE (Bootstrap v4 - Clean Name to bypass PostgREST cache zombie)
         if (mode === 'create') {
-            const { data, error } = await supabase.rpc('api_v1_bootstrap_organization', {
-                p_org_name: officialName,
+            const payload = {
+                p_org_name: commercialName,
                 p_first_name: firstName,
                 p_last_name: lastName,
                 p_job_title: jobTitle,
                 p_siret: siret,
                 p_official_name: officialName,
                 p_ape_code: apeCode,
-                p_specialty_id: selectedSpecialty || null,
-                p_address: address, // Pass Captured
-                p_lat: lat,         // Pass Captured
-                p_long: long        // Pass Captured
-            });
+                p_specialty_id: null,
+                p_address: address,
+                p_lat: lat,
+                p_long: long,
+                p_google_place_id: enrichmentConfirmed ? googleData?.place_id : null,
+                p_opening_hours: enrichmentConfirmed ? googleData?.opening_hours : {},
+                p_photos: enrichmentConfirmed ? googleData?.photoUrl ? [{ url: googleData.photoUrl }] : [] : [],
+                p_website: enrichmentConfirmed ? googleData?.website : null
+            };
+
+            const { data, error } = await supabase.rpc('api_create_org_v4', { payload });
 
             if (error) {
                 alert("Erreur Création: " + error.message);
@@ -214,7 +222,9 @@ export default function Step1IdentityPage() {
             const { error: orgError } = await supabase.from('organizations').update({
                 siret,
                 official_name: officialName,
+                name: commercialName, // Update Commercial Name
                 ape_code: apeCode
+                // Note: We are not updating Google Data on edit mode for now, as request focused on Creation/Bootstrap.
             }).eq('id', orgId);
 
             if (orgError) {
@@ -228,7 +238,7 @@ export default function Step1IdentityPage() {
                 first_name: firstName,
                 last_name: lastName,
                 job_title: jobTitle
-            }).eq('organization_id', orgId).eq('role', 'admin'); // Assuming current user is admin
+            }).eq('organization_id', orgId).eq('role', 'admin');
 
             if (proError) {
                 console.error("Pro Update Error", proError);
@@ -285,12 +295,67 @@ export default function Step1IdentityPage() {
                 </div>
                 {searchError && <p className="text-red-500 text-sm">{searchError}</p>}
 
-                {/* Results Block (Compagny) */}
+                {/* Google Place Match (Step 1.5 - Zero Friction) */}
+                {googleData && !enrichmentConfirmed && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded p-4 animate-in slide-in-from-top-4">
+                        <div className="flex gap-4 items-start">
+                            <div className="bg-indigo-100 p-2 rounded-full">
+                                <span className="text-2xl">🗺️</span>
+                            </div>
+                            <div className="flex-grow">
+                                <h3 className="font-semibold text-indigo-900">Est-ce bien votre établissement ?</h3>
+                                <p className="text-sm text-indigo-700">{googleData.name}</p>
+                                <p className="text-xs text-indigo-600 mb-2">{googleData.address}</p>
+
+                                {googleData.photoUrl && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={googleData.photoUrl} alt="Google Place" className="w-full h-32 object-cover rounded mb-2 border border-indigo-100" />
+                                )}
+
+                                <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => {
+                                        // Enrich Data
+                                        if (googleData.lat) setLat(googleData.lat);
+                                        if (googleData.lng) setLong(googleData.lng);
+                                        // We will pass other googleData (hours, photos) directly in handleNext
+                                        setEnrichmentConfirmed(true);
+                                    }} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                                        Oui, c'est moi
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setGoogleData(null)} className="text-slate-500">
+                                        Non / Ignorer
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {enrichmentConfirmed && (
+                    <div className="bg-green-50 border border-green-200 p-3 rounded text-sm text-green-800 flex items-center gap-2">
+                        ✅ Infos Google récupérées (Photos, Horaires, GPS précis).
+                    </div>
+                )}
+
+                {/* Results Block (Company) */}
                 <div className="grid gap-4 bg-slate-50 p-4 rounded">
                     <div>
                         <label className="block text-sm font-medium mb-1 text-slate-600">Raison Sociale (Auto)</label>
                         <input className="border p-2 rounded w-full bg-slate-100 text-slate-600" disabled value={officialName} />
                     </div>
+
+                    {/* Commercial Name - Editable */}
+                    <div>
+                        <label className="block text-sm font-medium mb-1 text-indigo-700">Nom Commercial / Enseigne</label>
+                        <input
+                            className="border p-2 rounded w-full border-indigo-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            value={commercialName}
+                            onChange={e => setCommercialName(e.target.value)}
+                            placeholder="Nom affiché aux clients (ex: Chez Marco)"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">C'est le nom que verront vos clients.</p>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium mb-1 text-slate-600">Code APE (Auto)</label>
                         <input className="border p-2 rounded w-full bg-slate-100 text-slate-600" disabled value={apeCode} />
@@ -333,26 +398,6 @@ export default function Step1IdentityPage() {
                         />
                     </div>
                 </div>
-
-                {/* Specialty Selector (Step 1.5) */}
-                {specialties.length > 0 && (
-                    <div className="animate-in fade-in slide-in-from-top-4 pt-4 border-t">
-                        <label className="block text-sm font-medium mb-1">Quelle est votre spécialité ?</label>
-                        <select
-                            className="border p-2 rounded w-full bg-white"
-                            value={selectedSpecialty}
-                            onChange={e => setSelectedSpecialty(e.target.value)}
-                        >
-                            <option value="">Sélectionnez une option...</option>
-                            {specialties.map(s => (
-                                <option key={s.id} value={s.id}>{s.label}</option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Cela nous permet de pré-configurer votre catalogue de services.
-                        </p>
-                    </div>
-                )}
 
             </div>
 

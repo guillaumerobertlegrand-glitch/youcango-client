@@ -156,7 +156,11 @@ export default function Step4TeamPage() {
             router.push("/onboardingpro/step-6-ready");
             return;
         } else {
-            alert("Configuration appliquée. Veuillez vérifier.");
+            const errorMsg = [];
+            if (!v4.valid) errorMsg.push("Etape 4: " + (v4.error || "Invalide"));
+            if (!v5.valid) errorMsg.push("Etape 5: " + (v5.error || "Invalide"));
+
+            alert("Configuration incomplète :\n" + errorMsg.join("\n"));
             setLoading(false);
         }
     };

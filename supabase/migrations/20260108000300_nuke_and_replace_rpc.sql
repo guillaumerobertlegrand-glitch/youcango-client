@@ -1,6 +1,36 @@
 -- 1. Standardization: Ensure 'state' is TEXT (not ENUM) to support new values without transaction lock issues
 -- This fixes the "column state is of type session_state" error and allows 'scheduled' value.
+
+-- DROP VIEW dependent on the column
+DROP VIEW IF EXISTS public.admin_sessions_view;
+
 ALTER TABLE public.sessions ALTER COLUMN state TYPE TEXT;
+
+-- RECREATE VIEW
+CREATE OR REPLACE VIEW public.admin_sessions_view AS
+SELECT 
+    s.id as session_id,
+    s.created_at,
+    s.state,
+    s.service_requested,
+    s.monetization_model,
+    s.arrival_timing,
+    -- Customer Info
+    cust.full_name as customer_name,
+    s.customer_id,
+    -- Provider Info
+    org.name as provider_name,
+    loc.address as provider_address
+FROM 
+    public.sessions s
+LEFT JOIN 
+    public.profiles cust ON s.customer_id = cust.id
+LEFT JOIN 
+    public.locations loc ON s.location_id = loc.id
+LEFT JOIN 
+    public.organizations org ON loc.organization_id = org.id
+ORDER BY 
+    s.created_at DESC;;
 DROP TYPE IF EXISTS session_state;
 
 -- 2. Nuke and Replace RPC (Clean Slate)

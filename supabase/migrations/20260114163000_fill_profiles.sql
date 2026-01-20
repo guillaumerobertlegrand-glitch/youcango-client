@@ -1,7 +1,3 @@
--- Auto-fill empty profiles to bypass Client Onboarding in Dev/Local
-UPDATE public.profiles 
-SET 
-  first_name = 'Test', 
-  last_name = 'User', 
-  full_name = 'Test User'
-WHERE first_name IS NULL OR last_name IS NULL;
+-- Superseded by 20260114170000_add_names_to_profiles.sql
+-- This file previously caused errors by referencing columns before they existed.
+-- Logic moved to the next migration.
