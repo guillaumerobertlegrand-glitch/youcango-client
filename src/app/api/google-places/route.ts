@@ -14,52 +14,73 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
         }
 
-        // 1. Find Place (to get Place ID)
-        const findResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id,name,formatted_address&key=${apiKey}`
-        );
-        const findData = await findResponse.json();
+        // 1. Text Search (New V1 API)
+        // Docs: https://developers.google.com/maps/documentation/places/web-service/text-search
+        const searchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.name,places.displayName,places.formattedAddress,places.id'
+            },
+            body: JSON.stringify({ textQuery: query })
+        });
 
-        if (!findData.candidates || findData.candidates.length === 0) {
-            return NextResponse.json({ found: false });
+        const searchData = await searchRes.json();
+
+        if (!searchData.places || searchData.places.length === 0) {
+            console.error("Google New API Error/Empty:", searchData);
+            return NextResponse.json({
+                found: false,
+                googleStatus: searchRes.status,
+                googleError: searchData.error?.message || 'No places found'
+            });
         }
 
-        const candidate = findData.candidates[0];
-        const placeId = candidate.place_id;
+        const candidate = searchData.places[0]; // Take best match
+        const placeId = candidate.name.split('/').pop(); // "places/ChIJ..." -> "ChIJ..." 
 
-        // 2. Details (to get rich data: geometry, photos, hours, website)
-        const detailsResponse = await fetch(
-            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,website,opening_hours,photos&key=${apiKey}`
-        );
-        const detailsData = await detailsResponse.json();
+        // 2. Place Details (New V1 API)
+        // Docs: https://developers.google.com/maps/documentation/places/web-service/place-details
+        const detailsRes = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,websiteUri,regularOpeningHours,photos'
+            }
+        });
 
-        if (!detailsData.result) {
-            return NextResponse.json({ found: false });
+        const detailsData = await detailsRes.json();
+
+        if (detailsData.error) {
+            return NextResponse.json({ found: false, googleError: detailsData.error.message });
         }
 
-        const result = detailsData.result;
-
-        // Format Photos
+        // 3. Format Response
         let photoUrl = null;
-        if (result.photos && result.photos.length > 0) {
-            const photoRef = result.photos[0].photo_reference;
-            // Construct URL (client can fetch or we proxy - for now just ID/ref)
-            photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoRef}&key=${apiKey}`;
+        if (detailsData.photos && detailsData.photos.length > 0) {
+            const photoName = detailsData.photos[0].name; // "places/{placeId}/photos/{photoId}"
+            // Use the media endpoint to get the image
+            // We return the direct Google URL that the frontend can use or a proxy URL.
+            // Google V1 Media URL format:
+            photoUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${apiKey}`;
         }
 
-        const payload = {
-            found: true,
-            place_id: placeId,
-            name: result.name,
-            address: result.formatted_address,
-            lat: result.geometry?.location?.lat,
-            lng: result.geometry?.location?.lng,
-            website: result.website,
-            opening_hours: result.opening_hours,
-            photoUrl: photoUrl
-        };
+        // 4. Adapt to Frontend Expectation
+        // Frontend expects: { found: true, place_id, name, address, lat, lng, website, opening_hours, photoUrl }
 
-        return NextResponse.json(payload);
+        return NextResponse.json({
+            found: true,
+            place_id: detailsData.id,
+            name: detailsData.displayName?.text,
+            address: detailsData.formattedAddress,
+            lat: detailsData.location?.latitude,
+            lng: detailsData.location?.longitude,
+            website: detailsData.websiteUri,
+            opening_hours: detailsData.regularOpeningHours, // Note: Structure might differ from Legacy (periods vs openNow). Frontend might need adjustment if it parses hours strictly.
+            photoUrl: photoUrl
+        });
 
     } catch (error) {
         console.error("Google Places Error:", error);

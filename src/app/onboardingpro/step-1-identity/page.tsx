@@ -93,8 +93,12 @@ export default function Step1IdentityPage() {
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await res.json();
+
             if (data.found) {
                 setGoogleData(data);
+            } else {
+                console.warn("Google Place Not Found");
+                setGoogleData(null);
             }
         } catch (e) {
             console.error("Google Search Failed", e);
