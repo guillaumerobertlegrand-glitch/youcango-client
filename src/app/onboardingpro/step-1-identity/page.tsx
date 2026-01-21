@@ -321,6 +321,7 @@ export default function Step1IdentityPage() {
                                         // Enrich Data
                                         if (googleData.lat) setLat(googleData.lat);
                                         if (googleData.lng) setLong(googleData.lng);
+                                        if (googleData.address) setAddress(googleData.address); // Sync Address
                                         // We will pass other googleData (hours, photos) directly in handleNext
                                         setEnrichmentConfirmed(true);
                                     }} className="bg-indigo-600 hover:bg-indigo-700 text-white">
