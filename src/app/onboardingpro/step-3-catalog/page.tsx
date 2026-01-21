@@ -149,25 +149,28 @@ export default function Step3CatalogPage() {
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     return (
-        <div className="p-6 space-y-8 max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold">Étape 3 : {isRestaurant ? "Votre Offre" : "Catalogue de Services"}</h1>
-            <p className="text-gray-500">
-                {isRestaurant
-                    ? "Définissez le profil de votre établissement."
-                    : "Ajoutez au moins une prestation pour continuer."}
-            </p>
+        <div className="flex flex-col min-h-full">
+            <div className="flex-grow p-4 space-y-6">
+                <header>
+                    <h1 className="text-xl font-bold text-slate-900">
+                        {isRestaurant ? "Votre Offre" : "Catalogue"}
+                    </h1>
+                    <p className="text-sm text-slate-500 mt-1">
+                        {isRestaurant
+                            ? "Définissez le profil de votre établissement."
+                            : "Ajoutez au moins une prestation pour continuer."}
+                    </p>
+                </header>
 
-            {isRestaurant ? (
-                /* RESTAURANT MODE UI */
-                <div className="space-y-6 border p-6 rounded bg-white shadow-sm">
-                    <h3 className="font-semibold text-center text-gray-700 bg-gray-50 p-2 rounded">Profil de votre établissement</h3>
+                {isRestaurant ? (
+                    /* RESTAURANT MODE UI */
+                    <div className="space-y-4">
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 space-y-4">
+                            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wider">Cuisine</h3>
 
-                    {/* Specialty Selector */}
-                    {specialties.length > 0 && (
-                        <div className="space-y-2 max-w-xs mx-auto">
-                            <label className="font-semibold block text-sm text-center">Type de Cuisine</label>
+                            {/* Specialty Selector */}
                             <select
-                                className="w-full border p-2 rounded text-center"
+                                className="w-full border p-3 rounded-lg bg-slate-50 text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20"
                                 value={selectedSpecialty}
                                 onChange={e => setSelectedSpecialty(e.target.value)}
                             >
@@ -176,67 +179,96 @@ export default function Step3CatalogPage() {
                                     <option key={s.id} value={s.id}>{s.label}</option>
                                 ))}
                             </select>
+                            {specialties.length === 0 && <p className="text-xs text-slate-400">Chargement des types de cuisine...</p>}
                         </div>
-                    )}
 
-                    <div className="space-y-4 text-center border-t pt-4">
-                        <label className="font-semibold flex items-center justify-center gap-2 text-sm">
-                            Gamme de Prix
-                        </label>
-                        <div className="flex justify-center gap-3">
-                            {[1, 2, 3, 4, 5].map((level) => (
-                                <button
-                                    key={level}
-                                    onClick={() => setPriceRange(level)}
-                                    className={`w-14 h-14 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-300
-                                        ${priceRange === level
-                                            ? 'border-indigo-600 bg-indigo-600 text-white scale-110 shadow-md ring-2 ring-indigo-200'
-                                            : 'border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-400'}`}
-                                >
-                                    {Array(level).fill('€').join('')}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                /* SERVICE/BEAUTY MODE UI */
-                <div className="space-y-4 border p-6 rounded bg-white shadow-sm">
-                    <h3 className="font-semibold text-lg">Vos Prestations</h3>
-
-                    <div className="space-y-2">
-                        {services.map(s => (
-                            <div key={s.id} className="flex justify-between items-center p-3 bg-slate-50 rounded border">
-                                <div>
-                                    <p className="font-medium">{s.designation}</p>
-                                    <p className="text-xs text-gray-500">
-                                        {s.estimated_duration} • {s.price > 0 ? `${s.price}€` : "Prix sur devis / variable"}
-                                    </p>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => deleteService(s.id)}>
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                </Button>
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 space-y-4">
+                            <h3 className="font-semibold text-slate-900 text-sm uppercase tracking-wider text-center">Gamme de Prix</h3>
+                            <div className="flex justify-between px-2">
+                                {[1, 2, 3, 4, 5].map((level) => (
+                                    <button
+                                        key={level}
+                                        onClick={() => setPriceRange(level)}
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-200
+                                            ${priceRange === level
+                                                ? 'bg-black text-white shadow-lg scale-110'
+                                                : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                    >
+                                        {Array(level).fill('€').join('')}
+                                    </button>
+                                ))}
                             </div>
-                        ))}
-                        {services.length === 0 && <p className="text-sm text-gray-400 italic">Aucun service créé.</p>}
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t grid gap-3">
-                        <input className="border p-2 rounded" placeholder="Nom du service (ex: Coupe Homme)" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
-                        <div className="flex gap-2">
-                            <input type="number" className="border p-2 rounded w-1/2" placeholder="Durée (min)" value={newDuration || ""} onChange={e => setNewDuration(parseInt(e.target.value) || 0)} />
-                            <input type="number" className="border p-2 rounded w-1/2" placeholder="Prix (Optionnel)" value={newPrice || ""} onChange={e => setNewPrice(parseFloat(e.target.value) || 0)} />
+                            <div className="flex justify-between text-[10px] text-slate-400 px-2 uppercase font-medium">
+                                <span>Éco</span>
+                                <span>Luxe</span>
+                            </div>
                         </div>
-                        <Button onClick={addService} variant="secondary" className="w-full flex gap-2 justify-center">
-                            <Plus className="w-4 h-4" /> Ajouter Service
-                        </Button>
                     </div>
-                </div>
-            )}
+                ) : (
+                    /* SERVICE/BEAUTY MODE UI */
+                    <div className="space-y-4">
+                        {/* List */}
+                        <div className="space-y-3">
+                            {services.map(s => (
+                                <div key={s.id} className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 shadow-sm animate-in slide-in-from-bottom-2">
+                                    <div>
+                                        <p className="font-medium text-slate-900">{s.designation}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <Clock className="w-3 h-3" /> {s.estimated_duration}
+                                            </span>
+                                            {s.price > 0 && (
+                                                <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <Banknote className="w-3 h-3" /> {s.price}€
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => deleteService(s.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full h-8 w-8">
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                            {services.length === 0 && (
+                                <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
+                                    <p className="text-sm text-slate-400">Aucun service pour le moment.</p>
+                                </div>
+                            )}
+                        </div>
 
-            <Button onClick={handleNext} className="w-full" disabled={loading || (!isRestaurant && services.length === 0)}>
-                {loading ? <Loader2 className="animate-spin mr-2" /> : "Valider & Suivant"}
-            </Button>
+                        {/* Add Form */}
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                            <h3 className="text-sm font-semibold text-slate-900">Nouveau Service</h3>
+                            <input
+                                className="w-full border p-3 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                                placeholder="Nom (ex: Coupe Homme)"
+                                value={newTitle}
+                                onChange={e => setNewTitle(e.target.value)}
+                            />
+                            <div className="flex gap-3">
+                                <div className="relative w-1/2">
+                                    <input type="number" className="w-full border p-3 pl-9 rounded-lg bg-white outline-none" placeholder="30" value={newDuration || ""} onChange={e => setNewDuration(parseInt(e.target.value) || 0)} />
+                                    <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                                </div>
+                                <div className="relative w-1/2">
+                                    <input type="number" className="w-full border p-3 pl-9 rounded-lg bg-white outline-none" placeholder="Prix" value={newPrice || ""} onChange={e => setNewPrice(parseFloat(e.target.value) || 0)} />
+                                    <Banknote className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                                </div>
+                            </div>
+                            <Button onClick={addService} className="w-full bg-slate-900 text-white hover:bg-black" disabled={!newTitle}>
+                                <Plus className="w-4 h-4 mr-2" /> Ajouter
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
+                <Button onClick={handleNext} className="w-full h-12 text-base font-semibold shadow-xl shadow-slate-200" disabled={loading || (!isRestaurant && services.length === 0)}>
+                    {loading ? <Loader2 className="animate-spin mr-2" /> : "Suivant"}
+                </Button>
+            </div>
         </div>
     );
 }

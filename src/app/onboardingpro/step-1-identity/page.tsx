@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Step1IdentityPage() {
@@ -50,8 +50,11 @@ export default function Step1IdentityPage() {
                 // Get User Profile (for bootstrap)
                 const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
                 if (profile) {
-                    setFirstName(profile.first_name || '');
-                    setLastName(profile.last_name || '');
+                    // Filter out default "New User" from Auth provider
+                    const f = profile.first_name === 'New' ? '' : profile.first_name || '';
+                    const l = profile.last_name === 'User' ? '' : profile.last_name || '';
+                    setFirstName(f);
+                    setLastName(l);
                 }
 
                 // Get Pro & Org
@@ -270,145 +273,146 @@ export default function Step1IdentityPage() {
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     return (
-        <div className="p-6 space-y-8 max-w-2xl mx-auto animation-fade-in">
-            <h1 className="text-2xl font-bold">
-                {mode === 'create' ? "Création de votre Espace Pro" : "Étape 1 : Identité Légale"}
-            </h1>
-            <p className="text-gray-500">
-                {mode === 'create'
-                    ? "Pour commencer, identifiez votre établissement et vous-même."
-                    : "Vérifiez les informations légales de votre entreprise."}
-            </p>
+        <div className="flex flex-col min-h-full">
+            <div className="flex-grow p-4 space-y-6">
+                <div className="space-y-5 pt-6">
 
-            <div className="space-y-6 border p-6 rounded bg-white shadow-sm">
-
-                {/* SIRET Search Block */}
-                <div className="flex gap-2 items-end">
-                    <div className="flex-grow">
-                        <label className="block text-sm font-medium mb-1">Numéro SIRET</label>
-                        <input
-                            className="border p-2 rounded w-full"
-                            placeholder="14 chiffres sans espaces"
-                            value={siret}
-                            onChange={e => setSiret(e.target.value.replace(/\s/g, ''))}
-                        />
-                    </div>
-                    <Button onClick={searchSiret} disabled={isSearching} variant="secondary">
-                        {isSearching ? <Loader2 className="animate-spin h-4 w-4" /> : "Rechercher"}
-                    </Button>
-                </div>
-                {searchError && <p className="text-red-500 text-sm">{searchError}</p>}
-
-                {/* Google Place Match (Step 1.5 - Zero Friction) */}
-                {googleData && !enrichmentConfirmed && (
-                    <div className="bg-indigo-50 border border-indigo-200 rounded p-4 animate-in slide-in-from-top-4">
-                        <div className="flex gap-4 items-start">
-                            <div className="bg-indigo-100 p-2 rounded-full">
-                                <span className="text-2xl">🗺️</span>
+                    {/* SIRET & Official Info Block */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
+                        {/* SIRET Input */}
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 tracking-wider ml-1">Numéro SIRET</label>
+                            <div className="flex gap-2">
+                                <input
+                                    className="flex-grow border p-2.5 rounded-lg bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20 border-slate-200 text-sm"
+                                    placeholder="14 chiffres"
+                                    value={siret}
+                                    onChange={e => setSiret(e.target.value.replace(/\s/g, ''))}
+                                    inputMode="numeric"
+                                />
+                                <Button
+                                    onClick={searchSiret}
+                                    disabled={isSearching}
+                                    variant="ghost"
+                                    className="px-4 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500"
+                                >
+                                    {isSearching ? <Loader2 className="animate-spin h-4 w-4" /> : "🔍"}
+                                </Button>
                             </div>
-                            <div className="flex-grow">
-                                <h3 className="font-semibold text-indigo-900">Est-ce bien votre établissement ?</h3>
-                                <p className="text-sm text-indigo-700">{googleData.name}</p>
-                                <p className="text-xs text-indigo-600 mb-2">{googleData.address}</p>
+                            {searchError && <p className="text-red-500 text-xs px-1">{searchError}</p>}
+                        </div>
 
-                                {googleData.photoUrl && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={googleData.photoUrl} alt="Google Place" className="w-full h-32 object-cover rounded mb-2 border border-indigo-100" />
-                                )}
-
-                                <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => {
-                                        // Enrich Data
-                                        if (googleData.lat) setLat(googleData.lat);
-                                        if (googleData.lng) setLong(googleData.lng);
-                                        if (googleData.address) setAddress(googleData.address); // Sync Address
-                                        // We will pass other googleData (hours, photos) directly in handleNext
-                                        setEnrichmentConfirmed(true);
-                                    }} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                                        Oui, c'est moi
-                                    </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setGoogleData(null)} className="text-slate-500">
-                                        Non / Ignorer
-                                    </Button>
+                        {/* Automated Info (Raison sociale, APE) */}
+                        {officialName && (
+                            <div className="pt-3 border-t border-slate-50 grid gap-3 animate-in fade-in slide-in-from-top-2">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 tracking-wider ml-1">Raison sociale</label>
+                                    <div className="w-full p-2.5 rounded-lg bg-slate-50 text-slate-600 text-sm border border-slate-100 font-medium">
+                                        {officialName}
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 tracking-wider ml-1">Code APE</label>
+                                    <div className="flex items-center gap-2 w-full p-2.5 rounded-lg bg-slate-50 text-slate-600 text-sm border border-slate-100 font-medium">
+                                        <span>{apeCode}</span>
+                                        {apeCode && isValidApe(apeCode) && <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto" />}
+                                    </div>
                                 </div>
                             </div>
+                        )}
+                    </div>
+
+                    {/* Google Place Match (Step 1.5 - Zero Friction) */}
+                    {googleData && !enrichmentConfirmed && (
+                        <div className="bg-white border border-indigo-100 rounded-xl p-4 shadow-md animate-in slide-in-from-bottom-4 space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-indigo-50 p-2 rounded-lg">
+                                    <span className="text-xl">📍</span>
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-slate-900 text-sm">C'est bien ici ?</h3>
+                                    <p className="text-sm text-indigo-900 font-medium">{googleData.name}</p>
+                                    <p className="text-xs text-slate-500 leading-tight">{googleData.address}</p>
+                                </div>
+                            </div>
+
+                            {googleData.photoUrl && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <div className="aspect-video w-full overflow-hidden rounded-lg bg-slate-100">
+                                    <img src={googleData.photoUrl} alt="Google Place" className="w-full h-full object-cover" />
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                <Button size="sm" variant="ghost" onClick={() => setGoogleData(null)} className="text-slate-400 hover:text-slate-600">
+                                    Non
+                                </Button>
+                                <Button size="sm" onClick={() => {
+                                    // Enrich Data
+                                    if (googleData.lat) setLat(googleData.lat);
+                                    if (googleData.lng) setLong(googleData.lng);
+                                    if (googleData.address) setAddress(googleData.address);
+                                    setEnrichmentConfirmed(true);
+                                }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-lg">
+                                    Oui, c'est moi
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {enrichmentConfirmed && (
-                    <div className="bg-green-50 border border-green-200 p-3 rounded text-sm text-green-800 flex items-center gap-2">
-                        ✅ Infos Google récupérées (Photos, Horaires, GPS précis).
-                    </div>
-                )}
+                    {enrichmentConfirmed && (
+                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg text-xs font-medium text-emerald-800 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" /> Infos Google récupérées.
+                        </div>
+                    )}
 
-                {/* Results Block (Company) */}
-                <div className="grid gap-4 bg-slate-50 p-4 rounded">
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-slate-600">Raison Sociale (Auto)</label>
-                        <input className="border p-2 rounded w-full bg-slate-100 text-slate-600" disabled value={officialName} />
-                    </div>
-
-                    {/* Commercial Name - Editable */}
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-indigo-700">Nom Commercial / Enseigne</label>
+                    {/* Commercial Name (Editable) */}
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1.5">
+                        <div className="flex flex-col">
+                            <label className="text-xs font-bold text-slate-900 tracking-wider ml-1">Nom Commercial</label>
+                            <span className="text-[10px] text-slate-400 ml-1 font-medium">(Celui visible par vos clients YouCanGo)</span>
+                        </div>
                         <input
-                            className="border p-2 rounded w-full border-indigo-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            className="w-full p-3 rounded-lg border-2 border-indigo-50 focus:border-indigo-500 focus:ring-0 text-slate-900 font-bold transition-all placeholder:font-normal"
                             value={commercialName}
                             onChange={e => setCommercialName(e.target.value)}
-                            placeholder="Nom affiché aux clients (ex: Chez Marco)"
                         />
-                        <p className="text-xs text-slate-500 mt-1">C'est le nom que verront vos clients.</p>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-slate-600">Code APE (Auto)</label>
-                        <input className="border p-2 rounded w-full bg-slate-100 text-slate-600" disabled value={apeCode} />
-                        {apeCode && !isValidApe(apeCode) && (
-                            <p className="text-red-500 text-xs mt-1">⚠️ Activité non supportée par la plateforme.</p>
-                        )}
-                        {apeCode && isValidApe(apeCode) && (
-                            <p className="text-green-600 text-xs mt-1">✅ Activité éligible.</p>
-                        )}
+                    {/* Profile Fields */}
+                    <div className="pt-4 border-t border-slate-100 hidden"></div>
+
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
+                        <h3 className="font-semibold text-slate-900">Votre Profil</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-xs text-slate-500">Prénom</label>
+                                <input className="w-full border p-2.5 rounded-lg text-sm" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs text-slate-500">Nom</label>
+                                <input className="w-full border p-2.5 rounded-lg text-sm" value={lastName} onChange={e => setLastName(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs text-slate-500">Fonction / Rôle</label>
+                            <input className="w-full border p-2.5 rounded-lg text-sm" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Gérant, Directeur, Responsable de salle..." />
+                        </div>
                     </div>
+
                 </div>
-
-                {/* Profile Fields (Required) */}
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="col-span-1">
-                        <label className="block text-sm font-medium mb-1">Prénom</label>
-                        <input
-                            className="border p-2 rounded w-full"
-                            value={firstName}
-                            onChange={e => setFirstName(e.target.value)}
-                            placeholder="Jean"
-                        />
-                    </div>
-                    <div className="col-span-1">
-                        <label className="block text-sm font-medium mb-1">Nom</label>
-                        <input
-                            className="border p-2 rounded w-full"
-                            value={lastName}
-                            onChange={e => setLastName(e.target.value)}
-                            placeholder="Dupont"
-                        />
-                    </div>
-                    <div className="col-span-2">
-                        <label className="block text-sm font-medium mb-1">Fonction / Rôle</label>
-                        <input
-                            className="border p-2 rounded w-full"
-                            value={jobTitle}
-                            onChange={e => setJobTitle(e.target.value)}
-                            placeholder="Ex: Gérant, Directeur technique, Chef d'atelier..."
-                        />
-                    </div>
-                </div>
-
             </div>
 
-            <Button onClick={handleNext} className="w-full" size="lg" disabled={!officialName || !isValidApe(apeCode) || !firstName || !lastName || !jobTitle}>
-                {mode === 'create' ? "Créer mon Espace & Continuer" : "Valider & Suivant"}
-            </Button>
+            {/* Sticky Footer Action */}
+            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
+                <Button
+                    onClick={handleNext}
+                    className="w-full h-12 text-base font-semibold shadow-xl shadow-indigo-200"
+                    disabled={!officialName || !isValidApe(apeCode) || !firstName || !lastName || !jobTitle}
+                >
+                    Valider et suivant
+                </Button>
+            </div>
         </div>
     );
 }

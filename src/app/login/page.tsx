@@ -10,7 +10,7 @@ export default async function LoginPage(props: {
 }) {
     const searchParams = await props.searchParams;
     return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-4">
             <Card className="w-full max-w-sm border-slate-200 shadow-xl">
                 <CardHeader className="space-y-1 text-center">
                     <div className="flex justify-center mb-2">

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, User, Users, Check, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { signout } from "@/app/login/actions";
+
 
 export default function Step4TeamPage() {
     const supabase = createClient();
@@ -240,161 +240,160 @@ export default function Step4TeamPage() {
     // Filter controls for non-admins
     const canManage = isAdmin;
 
+
     return (
-        <div className="p-6 space-y-8 max-w-3xl mx-auto">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Étape 4 : Équipe & Outils</h1>
-                <form action={signout}>
-                    <Button variant="ghost" size="sm" className="text-red-500">Se déconnecter</Button>
-                </form>
-            </div>
-
-            {/* Mode Toggle */}
-            <div className="flex justify-center space-x-10 p-6 bg-slate-50 rounded-xl border">
-                <div
-                    onClick={() => canManage && setMode('solo')}
-                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'solo' ? 'border-blue-600 bg-blue-50' : 'border-transparent hover:bg-white'} ${!canManage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <User className={`w-8 h-8 mb-2 ${mode === 'solo' ? 'text-blue-600' : 'text-gray-400'}`} />
-                    <span className="font-semibold">Solo</span>
-                    <span className="text-xs text-center text-gray-500">Je travaille seul</span>
-                </div>
-                <div
-                    onClick={() => canManage && setMode('team')}
-                    className={`cursor-pointer p-4 rounded-lg flex flex-col items-center border-2 w-40 transition-all ${mode === 'team' ? 'border-purple-600 bg-purple-50' : 'border-transparent hover:bg-white'} ${!canManage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <Users className={`w-8 h-8 mb-2 ${mode === 'team' ? 'text-purple-600' : 'text-gray-400'}`} />
-                    <span className="font-semibold">Équipe</span>
-                    <span className="text-xs text-center text-gray-500">Nous sommes plusieurs</span>
-                </div>
-            </div>
-
-            {mode === 'solo' ? (
-                <div className="border p-6 rounded bg-white shadow-sm space-y-4 text-center">
-                    <h3 className="font-semibold text-lg">Configuration Rapide</h3>
-                    <p className="text-gray-600">
-                        En mode Solo, nous vous assignons automatiquement tous les services.<br />
-                        Veuillez choisir votre outil de travail :
-                    </p>
-
-                    <div className="max-w-xs mx-auto my-4">
-                        <label className="block text-left text-sm font-medium text-gray-700 mb-1">Mon Terminal</label>
-                        <select
-                            className="block w-full border p-2 rounded bg-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            value={soloDeviceTypeId}
-                            onChange={(e) => setSoloDeviceTypeId(e.target.value)}
-                        >
-                            <option value="">Sélectionner...</option>
-                            {deviceTypes.map(t => (
-                                <option key={t.id} value={t.id}>{t.label}</option>
-                            ))}
-                        </select>
+        <div className="flex flex-col min-h-full">
+            <div className="flex-grow p-4 space-y-6">
+                <header className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-900">Équipe & Outils</h1>
+                        <p className="text-sm text-slate-500 mt-1">Qui utilisera YouCanGo ?</p>
                     </div>
+                </header>
 
-                    <div className="py-2">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full text-sm">
-                            <Check className="w-4 h-4" /> Admin: {myPro?.first_name}
-                        </div>
+                {/* Mode Toggle */}
+                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
+                    <div
+                        onClick={() => canManage && setMode('solo')}
+                        className={`cursor-pointer py-3 rounded-lg flex flex-col items-center justify-center transition-all ${mode === 'solo' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
+                    >
+                        <User className="w-5 h-5 mb-1" />
+                        <span className="text-xs font-semibold">Solo</span>
+                    </div>
+                    <div
+                        onClick={() => canManage && setMode('team')}
+                        className={`cursor-pointer py-3 rounded-lg flex flex-col items-center justify-center transition-all ${mode === 'team' ? 'bg-white shadow text-purple-600' : 'text-slate-400'}`}
+                    >
+                        <Users className="w-5 h-5 mb-1" />
+                        <span className="text-xs font-semibold">Équipe</span>
                     </div>
                 </div>
-            ) : (
-                <div className="border p-6 rounded bg-white shadow-sm space-y-6">
-                    <h3 className="font-semibold text-lg">Gestion de l'Équipe</h3>
 
-                    {/* Invite Form (Admins Only) */}
-                    {isAdmin && (
-                        <div className="flex flex-col gap-2 mb-6">
-                            <div className="flex gap-2">
-                                <input className="border p-2 rounded flex-1" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
-                                <input className="border p-2 rounded flex-1" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
-                            </div>
-                            <div className="flex gap-2">
-                                <input className="border p-2 rounded flex-grow" placeholder="Email Collaborateur" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
-                                <select className="border p-2 rounded bg-white w-32" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                                    <option value="admin">Admin</option>
-                                    <option value="editor">Editor</option>
-                                    <option value="user">User</option>
-                                </select>
-                                <Button onClick={sendInvite} size="sm" disabled={!inviteEmail || !inviteFirstName || !inviteLastName}>Inviter</Button>
-                            </div>
+                {mode === 'solo' ? (
+                    <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4 text-center">
+                        <div className="bg-blue-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto">
+                            <Smartphone className="w-6 h-6 text-blue-600" />
                         </div>
-                    )}
+                        <h3 className="font-semibold text-slate-900">Mode Solo</h3>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                            Vous êtes le seul utilisateur. Tout sera configué pour vous automatiquement.
+                        </p>
 
-                    {/* Team List with DIRECT DEVICE ASSIGNMENT */}
-                    <div className="space-y-4">
-                        {team
-                            // Sort: Me first, then Admin, then others
-                            .sort((a, b) => {
-                                if (a.user_id === userId) return -1;
-                                if (b.user_id === userId) return 1;
-                                return (b.role === 'admin' ? 1 : 0) - (a.role === 'admin' ? 1 : 0);
-                            })
-                            .map((member, index) => {
-                                // Find device assigned to this pro
-                                const assignedDevice = devices.find(d => d.pro_id === member.id);
-                                const currentTypeId = assignedDevice?.device_type_id || "";
+                        <div className="pt-4 text-left space-y-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Mon Terminal</label>
+                            <select
+                                className="w-full border p-3 rounded-lg bg-slate-50 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                value={soloDeviceTypeId}
+                                onChange={(e) => setSoloDeviceTypeId(e.target.value)}
+                            >
+                                <option value="">Sélectionner...</option>
+                                {deviceTypes.map(t => (
+                                    <option key={t.id} value={t.id}>{t.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {/* Invite Form (Admins Only) */}
+                        {isAdmin && (
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                <h3 className="text-sm font-semibold mb-3">Inviter un membre</h3>
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <input className="border p-2 rounded-lg text-sm w-1/2" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
+                                        <input className="border p-2 rounded-lg text-sm w-1/2" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
+                                    </div>
+                                    <input className="border p-2 rounded-lg text-sm w-full" placeholder="Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
+                                    <div className="flex gap-2">
+                                        <select className="border p-2 rounded-lg text-sm flex-grow bg-white" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                                            <option value="admin">Admin</option>
+                                            <option value="editor">Editor</option>
+                                            <option value="user">User</option>
+                                        </select>
+                                        <Button onClick={sendInvite} size="sm" className="px-4" disabled={!inviteEmail || !inviteFirstName}>Inviter</Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                                return (
-                                    <div key={member.id} className="p-4 border rounded bg-slate-50 flex flex-col md:flex-row gap-4 justify-between items-center relative">
-                                        {member.user_id === userId && (
-                                            <div className="absolute top-0 left-0 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-br font-bold">MOI ({member.role?.toUpperCase()})</div>
-                                        )}
+                        {/* Team List */}
+                        <div className="space-y-3">
+                            {team
+                                .sort((a, b) => {
+                                    if (a.user_id === userId) return -1;
+                                    if (b.user_id === userId) return 1;
+                                    return (b.role === 'admin' ? 1 : 0) - (a.role === 'admin' ? 1 : 0);
+                                })
+                                .map((member) => {
+                                    const assignedDevice = devices.find(d => d.pro_id === member.id);
+                                    const currentTypeId = assignedDevice?.device_type_id || "";
 
-                                        <div>
-                                            <p className="font-medium mt-1">{member.first_name} {member.last_name || ''}
-                                                {member.job_title && <span className="text-gray-500 text-sm font-normal"> - {member.job_title}</span>}
-                                            </p>
-                                            <p className="text-gray-400 text-xs">{member.email || 'Email non renseigné'}</p>
-                                            <div className="flex gap-2 mt-1">
-                                                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{member.role}</span>
-                                                <span className={`text-xs px-2 py-0.5 rounded ${member.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
-                                                    {member.status}
-                                                </span>
+                                    return (
+                                        <div key={member.id} className="p-4 bg-white rounded-xl shadow-sm border border-slate-100 relative">
+                                            {member.user_id === userId && (
+                                                <div className="absolute top-3 right-3">
+                                                    <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-full">MOI</span>
+                                                </div>
+                                            )}
+
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+                                                    {member.first_name[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 text-sm">{member.first_name} {member.last_name}</p>
+                                                    <p className="text-slate-400 text-xs">{member.job_title || member.role}</p>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="flex items-center gap-4">
-                                            {/* Direct Device Type Selector */}
-                                            <div className="flex items-center gap-2">
-                                                <Smartphone className={`w-4 h-4 ${assignedDevice ? 'text-green-600' : 'text-red-400'}`} />
-                                                <select
-                                                    className={`text-sm border rounded p-1 w-40 ${!assignedDevice ? 'border-red-300 bg-red-50' : ''}`}
-                                                    value={currentTypeId}
-                                                    onChange={(e) => assignDeviceType(member.id, e.target.value)}
-                                                    disabled={!isAdmin}
-                                                >
-                                                    <option value="">Choisir un terminal...</option>
-                                                    {deviceTypes.map(t => (
-                                                        <option key={t.id} value={t.id}>{t.label}</option>
-                                                    ))}
-                                                </select>
+                                            {/* Device Selector */}
+                                            <div className="bg-slate-50 p-2 rounded-lg flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Smartphone className={`w-4 h-4 ${assignedDevice ? 'text-emerald-500' : 'text-slate-300'}`} />
+                                                    <span className="text-xs font-semibold text-slate-500">Terminal :</span>
+                                                </div>
+                                                {isAdmin ? (
+                                                    <select
+                                                        className="text-xs border-none bg-transparent font-medium text-slate-900 outline-none text-right pr-1"
+                                                        value={currentTypeId}
+                                                        onChange={(e) => assignDeviceType(member.id, e.target.value)}
+                                                    >
+                                                        <option value="">(Aucun)</option>
+                                                        {deviceTypes.map(t => (
+                                                            <option key={t.id} value={t.id}>{t.label}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <span className="text-xs font-medium">{assignedDevice?.config_device_types?.label || "Aucun"}</span>
+                                                )}
                                             </div>
 
-                                            {/* Remove Button */}
                                             {isAdmin && member.user_id !== userId && (
-                                                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-red-600" onClick={() => removeMember(member.id)}>
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                                <div className="mt-2 text-right">
+                                                    <button onClick={() => removeMember(member.id)} className="text-xs text-red-400 hover:text-red-600 underline">Retirer</button>
+                                                </div>
                                             )}
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                        </div>
                     </div>
-                </div>
-            )}
-
-            <div className="space-y-4">
-                <Button onClick={mode === 'solo' ? handleSoloSetup : proceedNext} className="w-full" disabled={!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id))}>
-                    {mode === 'solo' ? "Configurer & Terminer" : "Valider & Suivant"}
-                </Button>
+                )}
 
                 {!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id)) && (
-                    <p className="text-center text-red-500 text-sm">
-                        En attente de l'administrateur : Certains membres n'ont pas de terminal.
-                        <br />Veuillez contacter l'admin pour finaliser la configuration.
-                    </p>
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-800 text-xs flex gap-2">
+                        <div className="font-bold">⚠️</div>
+                        <div>Attente Admin: Terminaux manquants.</div>
+                    </div>
                 )}
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
+                <Button onClick={mode === 'solo' ? handleSoloSetup : proceedNext} className="w-full h-12 text-base font-semibold shadow-xl shadow-slate-200" disabled={!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id))}>
+                    {mode === 'solo' ? "Configurer & Terminer" : "Suivant"}
+                </Button>
             </div>
         </div>
     );
