@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IOSSection, IOSRow } from "@/components/ui/ios-settings";
 
 export default function Step1IdentityPage() {
     const supabase = createClient();
@@ -33,6 +34,10 @@ export default function Step1IdentityPage() {
     // Google Places State
     const [googleData, setGoogleData] = useState<any>(null);
     const [enrichmentConfirmed, setEnrichmentConfirmed] = useState(false);
+
+    // Manual Search State
+    const [isManualSearch, setIsManualSearch] = useState(false);
+    const [manualQuery, setManualQuery] = useState("");
 
     // Pro Profile State
     const [firstName, setFirstName] = useState("");
@@ -98,7 +103,9 @@ export default function Step1IdentityPage() {
             const data = await res.json();
 
             if (data.found) {
+                console.log("Google Photo URL:", data.photoUrl);
                 setGoogleData(data);
+                setIsManualSearch(false); // Reset manual mode on success
             } else {
                 console.warn("Google Place Not Found");
                 setGoogleData(null);
@@ -111,7 +118,7 @@ export default function Step1IdentityPage() {
     // Data.gouv.fr Search
     const searchSiret = async () => {
         if (siret.length < 9) {
-            setSearchError("SIRET trop court (9 ou 14 chiffres).");
+            setSearchError("SIRET trop court.");
             return;
         }
         setIsSearching(true);
@@ -136,6 +143,7 @@ export default function Step1IdentityPage() {
                 // Capture Location
                 const rawAddress = result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue";
                 setAddress(rawAddress);
+                const city = result.siege?.libelle_commune || "";
 
                 let foundLat = 48.8566;
                 let foundLong = 2.3522;
@@ -150,14 +158,16 @@ export default function Step1IdentityPage() {
 
                 setSearchError(null);
 
-                // ZERO FRICTION: Trigger Google Search
+                // ZERO FRICTION: Trigger Google Search (Name + City)
                 const queryName = commercialName || cleanOfficialName;
-                searchGooglePlace(`${queryName} ${rawAddress}`);
+                const googleQuery = city ? `${queryName} ${city}` : `${queryName} ${rawAddress}`;
+                console.log("Searching Google with:", googleQuery);
+                searchGooglePlace(googleQuery);
             } else {
                 setSearchError("Aucune entreprise trouvée.");
             }
         } catch (e) {
-            setSearchError("Erreur de recherche API.");
+            setSearchError("Erreur API.");
             console.error(e);
         } finally {
             setIsSearching(false);
@@ -187,12 +197,12 @@ export default function Step1IdentityPage() {
 
         // 1.6 Validate Profile Fields
         if (!firstName || !lastName || !jobTitle || !commercialName) {
-            alert("Veuillez remplir toutes les informations (Nom commercial, Profil).");
+            alert("Veuillez remplir toutes les informations.");
             setLoading(false);
             return;
         }
 
-        // 2. CREATE (Bootstrap v4 - Clean Name to bypass PostgREST cache zombie)
+        // 2. CREATE (Bootstrap v4)
         if (mode === 'create') {
             const payload = {
                 p_org_name: commercialName,
@@ -229,9 +239,9 @@ export default function Step1IdentityPage() {
             const { error: orgError } = await supabase.from('organizations').update({
                 siret,
                 official_name: officialName,
-                name: commercialName, // Update Commercial Name
+                name: commercialName,
                 ape_code: apeCode
-                // Note: We are not updating Google Data on edit mode for now, as request focused on Creation/Bootstrap.
+                // Note: Not updating Google Data on edit mode strictly
             }).eq('id', orgId);
 
             if (orgError) {
@@ -265,152 +275,218 @@ export default function Step1IdentityPage() {
             await supabase.from('organizations').update({ onboarding_step: 2 }).eq('id', targetOrgId);
             router.push("/onboardingpro/step-2-finance");
         } else {
-            alert("Validation technique échouée post-création. Contactez le support.");
+            alert("Validation technique échouée. Contactez le support.");
             setLoading(false);
         }
     };
 
-    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-slate-400" /></div>;
 
     return (
-        <div className="flex flex-col min-h-full">
-            <div className="flex-grow p-4 space-y-6">
-                <div className="space-y-5 pt-6">
+        <div className="flex flex-col min-h-full font-sans">
+            <div className="flex-grow pt-0 pb-24">
 
-                    {/* SIRET & Official Info Block */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
-                        {/* SIRET Input */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 tracking-wider ml-1">Numéro SIRET</label>
-                            <div className="flex gap-2">
-                                <input
-                                    className="flex-grow border p-2.5 rounded-lg bg-slate-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500/20 border-slate-200 text-sm"
-                                    placeholder="14 chiffres"
-                                    value={siret}
-                                    onChange={e => setSiret(e.target.value.replace(/\s/g, ''))}
-                                    inputMode="numeric"
-                                />
-                                <Button
-                                    onClick={searchSiret}
-                                    disabled={isSearching}
-                                    variant="ghost"
-                                    className="px-4 border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-lg text-slate-500"
-                                >
-                                    {isSearching ? <Loader2 className="animate-spin h-4 w-4" /> : "🔍"}
-                                </Button>
-                            </div>
-                            {searchError && <p className="text-red-500 text-xs px-1">{searchError}</p>}
+                {/* Group 1: IDENTITY */}
+                <IOSSection
+                    title="Identité de l'établissement"
+                    className="mt-6"
+                >
+                    {/* SIRET */}
+                    <IOSRow label="SIRET">
+                        <div className="flex items-center gap-3 w-full justify-end">
+                            <input
+                                className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full"
+                                placeholder="14 chiffres"
+                                value={siret}
+                                onChange={e => setSiret(e.target.value.replace(/\s/g, ''))}
+                                inputMode="numeric"
+                            />
+
+                            <button
+                                onClick={searchSiret}
+                                disabled={isSearching}
+                                className="text-[17px] text-[#007AFF] active:opacity-50 transition-opacity whitespace-nowrap font-normal pl-2"
+                            >
+                                {isSearching ? <Loader2 className="animate-spin h-5 w-5" /> : "Rechercher"}
+                            </button>
                         </div>
+                    </IOSRow>
 
-                        {/* Automated Info (Raison sociale, APE) */}
-                        {officialName && (
-                            <div className="pt-3 border-t border-slate-50 grid gap-3 animate-in fade-in slide-in-from-top-2">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 tracking-wider ml-1">Raison sociale</label>
-                                    <div className="w-full p-2.5 rounded-lg bg-slate-50 text-slate-600 text-sm border border-slate-100 font-medium">
-                                        {officialName}
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 tracking-wider ml-1">Code APE</label>
-                                    <div className="flex items-center gap-2 w-full p-2.5 rounded-lg bg-slate-50 text-slate-600 text-sm border border-slate-100 font-medium">
-                                        <span>{apeCode}</span>
-                                        {apeCode && isValidApe(apeCode) && <CheckCircle className="w-4 h-4 text-emerald-500 ml-auto" />}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Google Place Match (Step 1.5 - Zero Friction) */}
-                    {googleData && !enrichmentConfirmed && (
-                        <div className="bg-white border border-indigo-100 rounded-xl p-4 shadow-md animate-in slide-in-from-bottom-4 space-y-3">
-                            <div className="flex items-start gap-3">
-                                <div className="bg-indigo-50 p-2 rounded-lg">
-                                    <span className="text-xl">📍</span>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 text-sm">C'est bien ici ?</h3>
-                                    <p className="text-sm text-indigo-900 font-medium">{googleData.name}</p>
-                                    <p className="text-xs text-slate-500 leading-tight">{googleData.address}</p>
-                                </div>
-                            </div>
-
-                            {googleData.photoUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <div className="aspect-video w-full overflow-hidden rounded-lg bg-slate-100">
-                                    <img src={googleData.photoUrl} alt="Google Place" className="w-full h-full object-cover" />
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                <Button size="sm" variant="ghost" onClick={() => setGoogleData(null)} className="text-slate-400 hover:text-slate-600">
-                                    Non
-                                </Button>
-                                <Button size="sm" onClick={() => {
-                                    // Enrich Data
-                                    if (googleData.lat) setLat(googleData.lat);
-                                    if (googleData.lng) setLong(googleData.lng);
-                                    if (googleData.address) setAddress(googleData.address);
-                                    setEnrichmentConfirmed(true);
-                                }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-lg">
-                                    Oui, c'est moi
-                                </Button>
-                            </div>
-                        </div>
+                    {/* Official Name (Read Only) */}
+                    {officialName && (
+                        <IOSRow label="Raison Sociale">
+                            <span className="text-[17px] text-[#3C3C43] truncate max-w-[200px]">{officialName}</span>
+                        </IOSRow>
                     )}
 
-                    {enrichmentConfirmed && (
-                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg text-xs font-medium text-emerald-800 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" /> Infos Google récupérées.
-                        </div>
-                    )}
-
-                    {/* Commercial Name (Editable) */}
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1.5">
-                        <div className="flex flex-col">
-                            <label className="text-xs font-bold text-slate-900 tracking-wider ml-1">Nom Commercial</label>
-                            <span className="text-[10px] text-slate-400 ml-1 font-medium">(Celui visible par vos clients YouCanGo)</span>
-                        </div>
+                    {/* Commercial Name */}
+                    <IOSRow label="Nom Commercial">
                         <input
-                            className="w-full p-3 rounded-lg border-2 border-indigo-50 focus:border-indigo-500 focus:ring-0 text-slate-900 font-bold transition-all placeholder:font-normal"
+                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full font-normal"
+                            placeholder="Nom affiché"
                             value={commercialName}
                             onChange={e => setCommercialName(e.target.value)}
                         />
-                    </div>
+                    </IOSRow>
 
-                    {/* Profile Fields */}
-                    <div className="pt-4 border-t border-slate-100 hidden"></div>
-
-                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
-                        <h3 className="font-semibold text-slate-900">Votre Profil</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500">Prénom</label>
-                                <input className="w-full border p-2.5 rounded-lg text-sm" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                    {/* APE Code */}
+                    {apeCode && (
+                        <IOSRow label="Code APE" isLast>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[17px] ${isValidApe(apeCode) ? 'text-[#34C759]' : 'text-[#FF3B30]'}`}>{apeCode}</span>
+                                {isValidApe(apeCode) && <CheckCircle className="w-4 h-4 text-[#34C759]" />}
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-slate-500">Nom</label>
-                                <input className="w-full border p-2.5 rounded-lg text-sm" value={lastName} onChange={e => setLastName(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs text-slate-500">Fonction / Rôle</label>
-                            <input className="w-full border p-2.5 rounded-lg text-sm" value={jobTitle} onChange={e => setJobTitle(e.target.value)} placeholder="Gérant, Directeur, Responsable de salle..." />
-                        </div>
-                    </div>
+                        </IOSRow>
+                    )}
+                </IOSSection>
 
-                </div>
+                <p className="px-[32px] mb-2 -mt-4 text-[13px] text-[#6b6b70]">
+                    Le nom commercial sera visible par vos clients.
+                </p>
+
+                {/* Error Message for Search */}
+                {searchError && (
+                    <div className="px-6 mb-4 -mt-2">
+                        <p className="text-[#FF3B30] text-[13px]">{searchError}</p>
+                    </div>
+                )}
+
+                {/* Group 2: ADMIN */}
+                <IOSSection title="Administrateur">
+                    {/* First Name - No Separator, Joined with Last Name */}
+                    <IOSRow label="Prénom" separator={false}>
+                        <input
+                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full font-normal"
+                            value={firstName}
+                            onChange={e => setFirstName(e.target.value)}
+                            placeholder="Requis"
+                        />
+                    </IOSRow>
+                    {/* Last Name */}
+                    <IOSRow label="Nom">
+                        <input
+                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full font-normal"
+                            value={lastName}
+                            onChange={e => setLastName(e.target.value)}
+                            placeholder="Requis"
+                        />
+                    </IOSRow>
+                    {/* Role */}
+                    <IOSRow label="Rôle" isLast>
+                        <input
+                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full font-normal"
+                            value={jobTitle}
+                            onChange={e => setJobTitle(e.target.value)}
+                            placeholder="Directeur, Gérant..."
+                        />
+                    </IOSRow>
+                </IOSSection>
+
+                {/* Google Suggestion Section */}
+                {(!enrichmentConfirmed && (googleData || isManualSearch)) && (
+                    <IOSSection title="Suggestion Google Maps" footer="Confirmez pour importer l'adresse et les horaires depuis Google.">
+
+                        {isManualSearch ? (
+                            <div className="p-4">
+                                <IOSRow label="Recherche" separator={false} isLast>
+                                    <div className="flex items-center gap-2 w-full justify-end">
+                                        <input
+                                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full"
+                                            placeholder="Nom et Ville..."
+                                            value={manualQuery}
+                                            onChange={e => setManualQuery(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') searchGooglePlace(manualQuery);
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => searchGooglePlace(manualQuery)}
+                                            className="text-[17px] text-[#007AFF] font-medium ml-2"
+                                        >
+                                            OK
+                                        </button>
+                                    </div>
+                                </IOSRow>
+                                <button
+                                    onClick={() => { setIsManualSearch(false); setManualQuery(""); }}
+                                    className="mt-4 text-[15px] text-[#007AFF] w-full text-center"
+                                >
+                                    Annuler
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="p-4 flex gap-4">
+                                    <div className="w-[45px] h-[45px] rounded-lg border border-[#e5e5ea] overflow-hidden shrink-0">
+                                        <div className="w-full h-full bg-[#f0f0f5] flex items-center justify-center">
+                                            <MapPin className="text-[#007AFF]" size={24} />
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <h4 className="font-semibold text-[17px] text-black truncate leading-tight">{googleData.name}</h4>
+                                        <p className="text-[13px] text-[#8E8E93] line-clamp-1 leading-tight mt-0.5">{googleData.address}</p>
+
+                                        {/* Matches not perfect? Manual Link */}
+                                        <button
+                                            onClick={() => { setIsManualSearch(true); setManualQuery(""); }}
+                                            className="text-left text-[13px] text-[#007AFF] mt-1 font-medium"
+                                        >
+                                            Ce n'est pas mon établissement ?
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 border-t border-[#e5e5ea] divide-x divide-[#e5e5ea]">
+                                    <button
+                                        onClick={() => setGoogleData(null)}
+                                        className="py-3 text-[17px] text-[#007AFF] font-normal active:bg-[#F2F2F7] transition-colors"
+                                    >
+                                        Ignorer
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (googleData.lat) setLat(googleData.lat);
+                                            if (googleData.lng) setLong(googleData.lng);
+                                            if (googleData.address) setAddress(googleData.address);
+                                            setEnrichmentConfirmed(true);
+                                        }}
+                                        className="py-3 text-[17px] text-[#007AFF] font-semibold active:bg-[#F2F2F7] transition-colors"
+                                    >
+                                        Confirmer
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </IOSSection>
+                )}
+
+                {enrichmentConfirmed && (
+                    <IOSSection className="mt-6">
+                        {googleData?.photoUrl && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                                src={googleData.photoUrl}
+                                alt="Aperçu Etablissement"
+                                className="w-full h-[160px] object-cover"
+                            />
+                        )}
+                        <IOSRow label="Données Google Maps" isLast>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[17px] text-[#34C759]">Importées</span>
+                                <CheckCircle className="w-4 h-4 text-[#34C759]" />
+                            </div>
+                        </IOSRow>
+                    </IOSSection>
+                )}
             </div>
 
-            {/* Sticky Footer Action */}
-            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
+            {/* Sticky Footer */}
+            <div className="sticky bottom-0 bg-[#F2F2F7]/95 backdrop-blur-md p-4 pb-8 border-t border-[#e5e5ea]">
                 <Button
                     onClick={handleNext}
-                    className="w-full h-12 text-base font-semibold shadow-xl shadow-indigo-200"
+                    className="w-full h-[50px] text-[17px] font-semibold bg-[#007AFF] hover:bg-[#007AFF]/90 rounded-xl shadow-none text-white"
                     disabled={!officialName || !isValidApe(apeCode) || !firstName || !lastName || !jobTitle}
                 >
-                    Valider et suivant
+                    Continuer
                 </Button>
             </div>
         </div>
