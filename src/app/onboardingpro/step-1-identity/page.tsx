@@ -418,8 +418,8 @@ export default function Step1IdentityPage() {
     console.log("=== UI RENDER CHECK ===", googleData);
 
     return (
-        <div className="flex flex-col min-h-full font-sans">
-            <div className="flex-grow pt-0 pb-24">
+        <div className="flex flex-col h-full font-sans bg-[#F2F2F7] relative overflow-hidden">
+            <div className="flex-1 pt-0 flex flex-col overflow-y-auto">
 
                 {/* Group 1: IDENTITY */}
                 <IOSSection
@@ -649,17 +649,17 @@ export default function Step1IdentityPage() {
                 )}
 
                 {/* Fixed Bottom Button */}
-                <div className="fixed bottom-6 left-0 right-0 px-4">
-                    <Button
-                        onClick={handleNext}
-                        disabled={loading}
-                        className="w-full h-[50px] bg-[#007AFF] hover:bg-[#005bb5] text-white text-[17px] font-semibold rounded-[14px] shadow-sm"
-                    >
-                        {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                        Continuer
-                    </Button>
-                </div>
+            </div>
 
+            <div className="p-4 pb-6 w-full bg-[#F2F2F7] shrink-0 z-10 relative">
+                <Button
+                    onClick={handleNext}
+                    disabled={loading}
+                    className="w-full h-[50px] bg-[#007AFF] hover:bg-[#005bb5] text-white text-[17px] font-semibold rounded-[16px] shadow-sm"
+                >
+                    {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                    Continuer
+                </Button>
             </div>
         </div>
     );
