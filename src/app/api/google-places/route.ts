@@ -14,71 +14,52 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
         }
 
-        // 1. Text Search (New V1 API)
-        // Docs: https://developers.google.com/maps/documentation/places/web-service/text-search
-        const searchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': 'places.name,places.displayName,places.formattedAddress,places.id'
-            },
-            body: JSON.stringify({ textQuery: query })
-        });
-
+        // 1. Legacy Text Search
+        // Docs: https://developers.google.com/maps/documentation/places/web-service/search-text
+        const searchRes = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`);
         const searchData = await searchRes.json();
 
-        if (!searchData.places || searchData.places.length === 0) {
-            console.error("Google New API Error/Empty:", searchData);
+        if (searchData.status !== 'OK' || !searchData.results || searchData.results.length === 0) {
+            console.error("Google Legacy API Error/Empty:", searchData);
             return NextResponse.json({
                 found: false,
-                googleStatus: searchRes.status,
-                googleError: searchData.error?.message || 'No places found'
+                googleStatus: searchData.status,
+                googleError: searchData.error_message || 'No places found'
             });
         }
 
-        const candidate = searchData.places[0]; // Take best match
-        const placeId = candidate.name.split('/').pop(); // "places/ChIJ..." -> "ChIJ..." 
+        const candidate = searchData.results[0]; // Take best match
+        const placeId = candidate.place_id;
 
-        // 2. Place Details (New V1 API)
-        // Docs: https://developers.google.com/maps/documentation/places/web-service/place-details
-        const detailsRes = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Goog-Api-Key': apiKey,
-                'X-Goog-FieldMask': 'id,displayName,formattedAddress,location,websiteUri,regularOpeningHours,photos'
-            }
-        });
-
+        // 2. Legacy Place Details
+        // Docs: https://developers.google.com/maps/documentation/places/web-service/details
+        const detailsRes = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,website,opening_hours,photos,place_id&key=${apiKey}`);
         const detailsData = await detailsRes.json();
 
-        if (detailsData.error) {
-            return NextResponse.json({ found: false, googleError: detailsData.error.message });
+        if (detailsData.status !== 'OK' || !detailsData.result) {
+            return NextResponse.json({ found: false, googleError: detailsData.error_message });
         }
 
-        // 3. Format Response
+        const details = detailsData.result;
+
+        // 3. Format Response with Legacy Photo URL
         let photoUrl = null;
-        if (detailsData.photos && detailsData.photos.length > 0) {
-            const photoName = detailsData.photos[0].name; // "places/{placeId}/photos/{photoId}"
-            // Use the media endpoint to get the image
-            // We return the direct Google URL that the frontend can use or a proxy URL.
-            // Google V1 Media URL format:
-            photoUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${apiKey}`;
+        if (details.photos && details.photos.length > 0) {
+            const photoRef = details.photos[0].photo_reference;
+            // Legacy Photo URL format
+            // Use NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for the client-side URL
+            photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${photoRef}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`;
         }
-
-        // 4. Adapt to Frontend Expectation
-        // Frontend expects: { found: true, place_id, name, address, lat, lng, website, opening_hours, photoUrl }
 
         return NextResponse.json({
             found: true,
-            place_id: detailsData.id,
-            name: detailsData.displayName?.text,
-            address: detailsData.formattedAddress,
-            lat: detailsData.location?.latitude,
-            lng: detailsData.location?.longitude,
-            website: detailsData.websiteUri,
-            opening_hours: detailsData.regularOpeningHours, // Note: Structure might differ from Legacy (periods vs openNow). Frontend might need adjustment if it parses hours strictly.
+            place_id: details.place_id,
+            name: details.name,
+            address: details.formatted_address,
+            lat: details.geometry?.location?.lat,
+            lng: details.geometry?.location?.lng,
+            website: details.website,
+            opening_hours: details.opening_hours,
             photoUrl: photoUrl
         });
 
