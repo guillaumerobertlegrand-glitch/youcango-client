@@ -116,12 +116,9 @@ export default function Step6ReadyPage() {
                         </div>
                     </div>
 
-                    <h1 className="text-[32px] font-bold text-black tracking-tight mb-2">
-                        C&apos;est parti !
+                    <h1 className="text-[28px] font-bold text-black tracking-tight mb-2">
+                        Votre espace <span className="font-extrabold">YouCanGo Pro</span> est prêt.
                     </h1>
-                    <p className="text-[17px] text-[#6b6b70] leading-relaxed max-w-xs mx-auto">
-                        Votre espace <span className="font-semibold text-black">YouCanGo Pro</span> est <br />prêt à l'emploi.
-                    </p>
                 </div>
 
                 {/* Recap Section */}
