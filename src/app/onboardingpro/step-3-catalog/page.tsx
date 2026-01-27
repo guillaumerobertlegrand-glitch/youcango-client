@@ -162,7 +162,7 @@ export default function Step3CatalogPage() {
                 {/* Header */}
                 <header className="mt-10 px-6 mb-2">
                     <h1 className="text-[22px] font-bold text-black tracking-tight">
-                        {isRestaurant ? "Votre Offre" : "Catalogue"}
+                        {isRestaurant ? "Votre offre" : "Catalogue"}
                     </h1>
                     <p className="text-[17px] text-[#000000] mt-2 leading-relaxed">
                         {isRestaurant
@@ -176,20 +176,27 @@ export default function Step3CatalogPage() {
                         <IOSSection title="Cuisine">
                             {/* Native Select styled as Text */}
                             <IOSRow label="Spécialité" separator={false}>
-                                <select
-                                    className={cn(
-                                        "appearance-none bg-transparent text-[17px] font-normal outline-none cursor-pointer text-right",
+                                <div className="relative w-full flex items-center justify-end">
+                                    <span className={cn(
+                                        "flex-1 text-right text-[17px] font-normal ml-auto",
                                         selectedSpecialty ? "text-[#3C3C43]" : "text-[#8E8E93]"
-                                    )}
-                                    value={selectedSpecialty}
-                                    onChange={e => setSelectedSpecialty(e.target.value)}
-                                    style={{ direction: 'rtl', width: '100%' }}
-                                >
-                                    <option value="" disabled>Choisir...</option>
-                                    {specialties.map(s => (
-                                        <option key={s.id} value={s.id} className="text-black text-left" style={{ direction: 'ltr' }}>{s.label}</option>
-                                    ))}
-                                </select>
+                                    )}>
+                                        {selectedSpecialty
+                                            ? specialties.find(s => s.id === selectedSpecialty)?.label
+                                            : "Choisir..."}
+                                    </span>
+                                    {/* Invisible Native Select for Interaction */}
+                                    <select
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                                        value={selectedSpecialty}
+                                        onChange={e => setSelectedSpecialty(e.target.value)}
+                                    >
+                                        <option value="" disabled>Choisir...</option>
+                                        {specialties.map(s => (
+                                            <option key={s.id} value={s.id}>{s.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </IOSRow>
                         </IOSSection>
 
