@@ -194,7 +194,7 @@ export default function Step5SkillsPage() {
             {/* Sticky Footer */}
             <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
                 <Button onClick={handleNext} className="w-full h-12 text-base font-semibold shadow-xl shadow-slate-200" size="lg">
-                    Valider & Terminer
+                    Continuer
                 </Button>
             </div>
         </div>
