@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, User, Users, Check, Smartphone, Trash2 } from "lucide-react";
+import { Loader2, Check, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { IOSSection, IOSRow } from "@/components/ui/ios-settings";
+import { cn } from "@/lib/utils";
 
 
 export default function Step4TeamPage() {
@@ -23,14 +24,12 @@ export default function Step4TeamPage() {
     const [devices, setDevices] = useState<any[]>([]);
     const [deviceTypes, setDeviceTypes] = useState<any[]>([]);
 
+    // Invite
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRole, setInviteRole] = useState("editor");
     const [inviteFirstName, setInviteFirstName] = useState("");
     const [inviteLastName, setInviteLastName] = useState("");
 
-    // Device Form
-    const [newDeviceName, setNewDeviceName] = useState("");
-    const [newDeviceTypeId, setNewDeviceTypeId] = useState("");
+    // Solo Device Form
     const [soloDeviceTypeId, setSoloDeviceTypeId] = useState("");
 
     useEffect(() => {
@@ -55,7 +54,6 @@ export default function Step4TeamPage() {
 
     const fetchData = async (oid: string) => {
         const { data: pros } = await supabase.from('professionals').select('*, devices(*)').eq('organization_id', oid);
-        // We still fetch devices to know current assignments
         let { data: devs } = await supabase.from('devices').select('*, config_device_types(label)').eq('organization_id', oid);
 
         setTeam(pros || []);
@@ -69,8 +67,6 @@ export default function Step4TeamPage() {
     // Actions
     const assignDeviceType = async (proId: string, typeId: string) => {
         if (!orgId) return;
-        // Optimistic UI update could be added here, but for now wait for server
-        // If typeId is empty, we might want to "unassign"? The RPC/UI implies selection.
         if (!typeId) return;
 
         const { data, error } = await supabase.rpc('api_v1_assign_device_type', {
@@ -99,7 +95,6 @@ export default function Step4TeamPage() {
         const myProId = team.find(p => p.user_id === userId)?.id;
 
         if (myProId) {
-            // Assign Selected Device
             await supabase.rpc('api_v1_assign_device_type', { p_pro_id: myProId, p_type_id: soloDeviceTypeId, p_org_id: orgId });
 
             // Auths (Service Permissions)
@@ -110,48 +105,14 @@ export default function Step4TeamPage() {
             }
         }
 
-        // Refresh data to verify assignment before proceeding (crucial for validation check)
-        await fetchData(orgId);
-
-        // Wait a bit or verify directly?
-        // Proceed Next will check 'devices'. fetchData updates 'devices'.
-        // BUT fetchData is async. 'await fetchData' finishes updating state?
-        // No, React state updates are async. calling proceedNext immediately uses OLD 'devices' state.
-
-        // WORKAROUND: We need to trigger proceedNext AFTER state update or bypass local check if we trust RPC.
-        // Better: We reload page or we pass a flag to proceedNext?
-        // Or simpler: We make proceedNext check DB? No, it uses 'devices' state.
-
-        // Hack: Check assignment manually or rely on effect?
-        // I will make proceedNext check validity via RPC call directly if local check fails?
-        // Or better: Just verify by re-fetching and then calling proceed...
-        // Actually, proceedNext uses 'devices' state variable.
-        // We can't wait for state update in same function easily.
-        // I will move proceedNext call to a useEffect or just assume it works and manually update the local 'devices' array for the check?
-        // Let's manually update 'devices' local state for the check to pass immediately.
-
-        // Actually, simpler: Recalling fetchData updates state.
-        // I will just use `setTimeout` hack or just return and let user click "Valider" again?
-        // User wants "Configurer & Terminer". It should be one click.
-
-        // I'll update the proceedNext logic to allow passing fresh data OR just run the validation RPC directly without local check if mode==solo?
-        // No, local check provides better feedback.
-
+        // Refresh data and Validate
         const { data: freshDevs } = await supabase.from('devices').select('*').eq('organization_id', orgId);
         setDevices(freshDevs || []);
-        // Even if I setDevices, 'devices' const in scope is old.
 
-        // I'll call the validation RPC directly here to decide.
-        // For Solo: We skip Step 5 (Skills) visually, but we must ensure it passes validation.
-        // Since we upserted authorizations above, S5 validation (check if auths exist) should pass.
-
-        // Check Step 4 first
         const { data: v4 } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
-        // Check Step 5 (implicit for Solo)
         const { data: v5 } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 5, p_org_id: orgId });
 
         if (v4.valid && v5.valid) {
-            // Updated to Step 6 (Ready)
             await supabase.from('organizations').update({ onboarding_step: 6 }).eq('id', orgId);
             router.push("/onboardingpro/step-6-ready");
             return;
@@ -168,13 +129,13 @@ export default function Step4TeamPage() {
     const sendInvite = async () => {
         if (!orgId) return;
         setLoading(true);
-        // Note: The API route needs to better handle first/last name
+        // Default Role: Editor
         const res = await fetch('/api/invite-editor', {
             method: 'POST',
             body: JSON.stringify({
                 email: inviteEmail,
                 organization_id: orgId,
-                role: inviteRole,
+                role: 'editor',
                 first_name: inviteFirstName,
                 last_name: inviteLastName
             })
@@ -212,9 +173,6 @@ export default function Step4TeamPage() {
             return;
         }
 
-        // DEVICE ASSIGNMENT RULE (Strict)
-        // Check if every active pro has a device assigned (which means it's in the devices list)
-        // Since we auto-create devices, checking if a device exists for the pro is enough.
         const unequipped = team.filter(member => !devices.some(d => d.pro_id === member.id && d.status === 'active'));
         if (unequipped.length > 0) {
             alert(`Attention : Certains membres n'ont pas de terminal assigné (${unequipped.map(m => m.first_name).join(', ')}).\n\nVeuillez sélectionner un type d'appareil pour chacun.`);
@@ -223,7 +181,6 @@ export default function Step4TeamPage() {
 
         const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
         if (result.valid) {
-            // Team Mode -> Go to Step 5 (Skills)
             await supabase.from('organizations').update({ onboarding_step: 5 }).eq('id', orgId);
             router.push("/onboardingpro/step-5-skills");
         } else {
@@ -232,169 +189,195 @@ export default function Step4TeamPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-gray-500" /></div>;
 
     const myPro = team.find(p => p.user_id === userId);
     const isAdmin = myPro?.role === 'admin';
-
-    // Filter controls for non-admins
     const canManage = isAdmin;
 
-
     return (
-        <div className="flex flex-col min-h-full">
-            <div className="flex-grow p-4 space-y-6">
-                <header className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-900">Équipe & Outils</h1>
-                        <p className="text-sm text-slate-500 mt-1">Qui utilisera YouCanGo ?</p>
-                    </div>
+        <div className="h-full font-sans bg-[#F2F2F7] relative overflow-hidden flex flex-col">
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pb-6">
+
+                {/* Header */}
+                <header className="mt-10 px-6 mb-2">
+                    <h1 className="text-[22px] font-bold text-black tracking-tight">
+                        Équipe & Outils
+                    </h1>
+                    <p className="text-[17px] text-[#000000] mt-2 leading-relaxed">
+                        Qui utilisera YouCanGo ?
+                    </p>
                 </header>
 
-                {/* Mode Toggle */}
-                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
-                    <div
+                {/* Mode Selector */}
+                <IOSSection title="Mode d'utilisation">
+                    <IOSRow
+                        label="Solo (Indépendant)"
                         onClick={() => canManage && setMode('solo')}
-                        className={`cursor-pointer py-3 rounded-lg flex flex-col items-center justify-center transition-all ${mode === 'solo' ? 'bg-white shadow text-blue-600' : 'text-slate-400'}`}
+                        separator={true}
                     >
-                        <User className="w-5 h-5 mb-1" />
-                        <span className="text-xs font-semibold">Solo</span>
-                    </div>
-                    <div
+                        {mode === 'solo' && <Check className="w-5 h-5 text-[#007AFF]" />}
+                    </IOSRow>
+                    <IOSRow
+                        label="Équipe (Plusieurs terminaux)"
                         onClick={() => canManage && setMode('team')}
-                        className={`cursor-pointer py-3 rounded-lg flex flex-col items-center justify-center transition-all ${mode === 'team' ? 'bg-white shadow text-purple-600' : 'text-slate-400'}`}
+                        separator={false}
                     >
-                        <Users className="w-5 h-5 mb-1" />
-                        <span className="text-xs font-semibold">Équipe</span>
-                    </div>
-                </div>
+                        {mode === 'team' && <Check className="w-5 h-5 text-[#007AFF]" />}
+                    </IOSRow>
+                </IOSSection>
+
 
                 {mode === 'solo' ? (
-                    <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4 text-center">
-                        <div className="bg-blue-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto">
-                            <Smartphone className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <h3 className="font-semibold text-slate-900">Mode Solo</h3>
-                        <p className="text-sm text-slate-500 leading-relaxed">
-                            Vous êtes le seul utilisateur. Tout sera configué pour vous automatiquement.
-                        </p>
-
-                        <div className="pt-4 text-left space-y-2">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Mon Terminal</label>
-                            <select
-                                className="w-full border p-3 rounded-lg bg-slate-50 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={soloDeviceTypeId}
-                                onChange={(e) => setSoloDeviceTypeId(e.target.value)}
-                            >
-                                <option value="">Sélectionner...</option>
-                                {deviceTypes.map(t => (
-                                    <option key={t.id} value={t.id}>{t.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        {/* Invite Form (Admins Only) */}
-                        {isAdmin && (
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                <h3 className="text-sm font-semibold mb-3">Inviter un membre</h3>
-                                <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <input className="border p-2 rounded-lg text-sm w-1/2" placeholder="Prénom" value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} />
-                                        <input className="border p-2 rounded-lg text-sm w-1/2" placeholder="Nom" value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} />
-                                    </div>
-                                    <input className="border p-2 rounded-lg text-sm w-full" placeholder="Email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} />
-                                    <div className="flex gap-2">
-                                        <select className="border p-2 rounded-lg text-sm flex-grow bg-white" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                                            <option value="admin">Admin</option>
-                                            <option value="editor">Editor</option>
-                                            <option value="user">User</option>
-                                        </select>
-                                        <Button onClick={sendInvite} size="sm" className="px-4" disabled={!inviteEmail || !inviteFirstName}>Inviter</Button>
-                                    </div>
-                                </div>
+                    <IOSSection title="Configuration">
+                        <IOSRow label="Mon Terminal" separator={false}>
+                            <div className="relative w-full flex items-center justify-end">
+                                <span className={cn(
+                                    "flex-1 text-right text-[17px] font-normal ml-auto",
+                                    soloDeviceTypeId ? "text-[#3C3C43]" : "text-[#8E8E93]"
+                                )}>
+                                    {soloDeviceTypeId
+                                        ? deviceTypes.find(t => t.id === soloDeviceTypeId)?.label
+                                        : "Choisir..."}
+                                </span>
+                                <select
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                                    value={soloDeviceTypeId}
+                                    onChange={e => setSoloDeviceTypeId(e.target.value)}
+                                >
+                                    <option value="" disabled>Choisir...</option>
+                                    {deviceTypes.map(t => (
+                                        <option key={t.id} value={t.id}>{t.label}</option>
+                                    ))}
+                                </select>
                             </div>
-                        )}
-
+                        </IOSRow>
+                    </IOSSection>
+                ) : (
+                    <>
                         {/* Team List */}
-                        <div className="space-y-3">
+                        <IOSSection title="Membres de l'équipe">
                             {team
                                 .sort((a, b) => {
                                     if (a.user_id === userId) return -1;
                                     if (b.user_id === userId) return 1;
                                     return (b.role === 'admin' ? 1 : 0) - (a.role === 'admin' ? 1 : 0);
                                 })
-                                .map((member) => {
+                                .map((member, idx) => {
                                     const assignedDevice = devices.find(d => d.pro_id === member.id);
                                     const currentTypeId = assignedDevice?.device_type_id || "";
 
+                                    // Custom visual label with initials? IOSRow label is string. 
+                                    // We'll just put Name in Label.
+                                    const isMe = member.user_id === userId;
+                                    const label = `${member.first_name} ${member.last_name}${isMe ? " (Moi)" : ""}`;
+
                                     return (
-                                        <div key={member.id} className="p-4 bg-white rounded-xl shadow-sm border border-slate-100 relative">
-                                            {member.user_id === userId && (
-                                                <div className="absolute top-3 right-3">
-                                                    <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-full">MOI</span>
+                                        <IOSRow
+                                            key={member.id}
+                                            label={label}
+                                            separator={idx !== team.length - 1}
+                                        >
+                                            <div className="flex items-center gap-2 justify-end w-full relative">
+                                                {/* Device Selector */}
+                                                <div className="relative flex items-center justify-end min-w-[100px]">
+                                                    <span className={cn(
+                                                        "text-right text-[17px] font-normal truncate max-w-[140px]",
+                                                        currentTypeId ? "text-[#3C3C43]" : "text-[#8E8E93]"
+                                                    )}>
+                                                        {currentTypeId
+                                                            ? deviceTypes.find(t => t.id === currentTypeId)?.label
+                                                            : "Assigner..."}
+                                                    </span>
+                                                    {isAdmin && (
+                                                        <select
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                                                            value={currentTypeId}
+                                                            onChange={e => assignDeviceType(member.id, e.target.value)}
+                                                        >
+                                                            <option value="" disabled>Choisir...</option>
+                                                            {deviceTypes.map(t => (
+                                                                <option key={t.id} value={t.id}>{t.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
                                                 </div>
-                                            )}
 
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
-                                                    {member.first_name[0]}
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 text-sm">{member.first_name} {member.last_name}</p>
-                                                    <p className="text-slate-400 text-xs">{member.job_title || member.role}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Device Selector */}
-                                            <div className="bg-slate-50 p-2 rounded-lg flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <Smartphone className={`w-4 h-4 ${assignedDevice ? 'text-emerald-500' : 'text-slate-300'}`} />
-                                                    <span className="text-xs font-semibold text-slate-500">Terminal :</span>
-                                                </div>
-                                                {isAdmin ? (
-                                                    <select
-                                                        className="text-xs border-none bg-transparent font-medium text-slate-900 outline-none text-right pr-1"
-                                                        value={currentTypeId}
-                                                        onChange={(e) => assignDeviceType(member.id, e.target.value)}
+                                                {/* Delete Action (Admin only, not self) */}
+                                                {isAdmin && !isMe && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); removeMember(member.id); }}
+                                                        className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-full ml-2 active:bg-red-100 z-10 relative"
                                                     >
-                                                        <option value="">(Aucun)</option>
-                                                        {deviceTypes.map(t => (
-                                                            <option key={t.id} value={t.id}>{t.label}</option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <span className="text-xs font-medium">{assignedDevice?.config_device_types?.label || "Aucun"}</span>
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 )}
                                             </div>
-
-                                            {isAdmin && member.user_id !== userId && (
-                                                <div className="mt-2 text-right">
-                                                    <button onClick={() => removeMember(member.id)} className="text-xs text-red-400 hover:text-red-600 underline">Retirer</button>
-                                                </div>
-                                            )}
-                                        </div>
+                                        </IOSRow>
                                     );
                                 })}
-                        </div>
-                    </div>
+                        </IOSSection>
+
+                        {/* Invite Section */}
+                        {isAdmin && (
+                            <IOSSection title="Nouveau Membre">
+                                <IOSRow label="Prénom" separator={true}>
+                                    <input
+                                        className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
+                                        placeholder="Requis"
+                                        value={inviteFirstName}
+                                        onChange={e => setInviteFirstName(e.target.value)}
+                                    />
+                                </IOSRow>
+                                <IOSRow label="Nom" separator={true}>
+                                    <input
+                                        className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
+                                        placeholder="Requis"
+                                        value={inviteLastName}
+                                        onChange={e => setInviteLastName(e.target.value)}
+                                    />
+                                </IOSRow>
+                                <IOSRow label="Email" separator={true}>
+                                    <input
+                                        className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
+                                        placeholder="email@exemple.com"
+                                        value={inviteEmail}
+                                        onChange={e => setInviteEmail(e.target.value)}
+                                        autoCapitalize="none"
+                                        type="email"
+                                    />
+                                </IOSRow>
+                                <div className="p-4">
+                                    <Button
+                                        onClick={sendInvite}
+                                        disabled={!inviteEmail || !inviteFirstName || !inviteLastName}
+                                        className="w-full bg-black text-white font-semibold h-11 rounded-[14px]"
+                                    >
+                                        <Plus className="w-5 h-5 mr-2" /> Inviter
+                                    </Button>
+                                </div>
+                            </IOSSection>
+                        )}
+                    </>
                 )}
 
-                {!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id)) && (
-                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-800 text-xs flex gap-2">
-                        <div className="font-bold">⚠️</div>
-                        <div>Attente Admin: Terminaux manquants.</div>
-                    </div>
-                )}
             </div>
 
             {/* Sticky Footer */}
-            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
-                <Button onClick={mode === 'solo' ? handleSoloSetup : proceedNext} className="w-full h-12 text-base font-semibold shadow-xl shadow-slate-200" disabled={!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id))}>
-                    Continuer
-                </Button>
+            <div className="shrink-0 z-10 relative mt-auto pb-6 pt-2 bg-[#F2F2F7]/80 backdrop-blur-md border-t border-[#C6C6C8]/30">
+                <div className="px-4">
+                    <Button
+                        onClick={mode === 'solo' ? handleSoloSetup : proceedNext}
+                        disabled={loading || (!isAdmin && team.some(m => !devices.some(d => d.pro_id === m.id)))}
+                        className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
+                    >
+                        {loading ? <Loader2 className="animate-spin mr-2" /> : "Continuer"}
+                    </Button>
+                </div>
             </div>
+
         </div>
     );
 }
