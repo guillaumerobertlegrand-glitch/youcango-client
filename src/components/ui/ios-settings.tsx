@@ -30,6 +30,7 @@ export function IOSSection({ title, children, footer, className }: IOSSectionPro
 
 interface IOSRowProps {
   label: string;
+  icon?: React.ReactNode;
   children?: React.ReactNode;
   isLast?: boolean;
   separator?: boolean;
@@ -39,6 +40,7 @@ interface IOSRowProps {
 
 export function IOSRow({
   label,
+  icon,
   children,
   isLast = false,
   separator = true,
@@ -57,7 +59,10 @@ export function IOSRow({
 
       {/* Main Content Area - Left Padding 16px always */}
       <div className="flex-1 flex items-center justify-between py-[11px] min-h-[44px] pl-[16px]">
-        <span className="text-[17px] text-[#000000] tracking-tight font-normal whitespace-nowrap">{label}</span>
+        <div className="flex items-center gap-3">
+          {icon && <span className="text-[#8E8E93]">{icon}</span>}
+          <span className="text-[17px] text-[#000000] tracking-tight font-normal whitespace-nowrap">{label}</span>
+        </div>
         <div className="flex-1 ml-4 text-right flex items-center justify-end text-[17px]">
           {children}
         </div>

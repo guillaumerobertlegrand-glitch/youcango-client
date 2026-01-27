@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Rocket, Briefcase, Zap, CheckCircle, Store, Check } from "lucide-react";
+import { Loader2, Store, Check, Clock, CreditCard, List, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IOSSection, IOSRow } from "@/components/ui/ios-settings";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,7 @@ export default function Step6ReadyPage() {
                         <Store className="w-12 h-12 text-[#007AFF]" />
                     </div>
 
-                    <h1 className="text-[28px] font-bold text-black tracking-tight mb-4">
+                    <h1 className="text-[32px] font-bold text-black tracking-tight mb-4">
                         Bonjour {pro?.first_name} !
                     </h1>
                     <p className="text-[17px] text-[#000000] leading-relaxed max-w-xs mx-auto">
@@ -91,7 +91,7 @@ export default function Step6ReadyPage() {
                             onClick={handleAccess}
                             className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
                         >
-                            Accéder à l'interface
+                            Ouvrir mon établissement
                         </Button>
                     </div>
                 </div>
@@ -106,42 +106,60 @@ export default function Step6ReadyPage() {
             <div className="flex-1 overflow-y-auto pb-6 flex flex-col">
 
                 {/* Hero Section */}
-                <div className="flex flex-col items-center pt-16 pb-8 px-6 text-center">
+                <div className="flex flex-col items-center pt-16 pb-10 px-6 text-center">
                     <div className="relative mb-8">
-                        <div className="absolute inset-0 bg-green-400 rounded-full blur-2xl opacity-20 animate-pulse"></div>
-                        <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg relative z-10">
-                            <CheckCircle className="w-12 h-12 text-[#34C759]" />
+                        {/* Premium Gradient Shadow */}
+                        <div className="absolute inset-0 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
+                        {/* Large Success Circle */}
+                        <div className="w-[100px] h-[100px] bg-gradient-to-br from-[#34C759] to-[#32D74B] rounded-full flex items-center justify-center shadow-xl relative z-10 border-[4px] border-white">
+                            <Check className="w-12 h-12 text-white stroke-[3px]" />
                         </div>
                     </div>
 
-                    <h1 className="text-[28px] font-bold text-black tracking-tight mb-2">
-                        Tout est prêt !
+                    <h1 className="text-[32px] font-bold text-black tracking-tight mb-2">
+                        C&apos;est parti !
                     </h1>
                     <p className="text-[17px] text-[#6b6b70] leading-relaxed max-w-xs mx-auto">
-                        Votre espace <span className="font-semibold text-black">YouCanGo Pro</span> est configuré.
+                        Votre espace <span className="font-semibold text-black">YouCanGo Pro</span> est <br />prêt à l'emploi.
                     </p>
                 </div>
 
                 {/* Recap Section */}
                 <IOSSection title="Récapitulatif">
-                    <IOSRow label="Identité & Horaires" separator={true}>
-                        <div className="flex items-center text-[#34C759] font-medium text-[15px]">
-                            <Check className="w-4 h-4 mr-1" /> Configuré
+                    <IOSRow
+                        label="Identité & Horaires"
+                        icon={<Clock className="w-[18px] h-[18px]" />}
+                        separator={true}
+                    >
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#34C759]">
+                            <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
                         </div>
                     </IOSRow>
-                    <IOSRow label="Paiements" separator={true}>
-                        <div className="flex items-center text-[#34C759] font-medium text-[15px]">
-                            <Check className="w-4 h-4 mr-1" /> Configuré
+                    <IOSRow
+                        label="Paiements"
+                        icon={<CreditCard className="w-[18px] h-[18px]" />}
+                        separator={true}
+                    >
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#34C759]">
+                            <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
                         </div>
                     </IOSRow>
-                    <IOSRow label="Catalogue" separator={true}>
-                        <div className="flex items-center text-[#34C759] font-medium text-[15px]">
-                            <Check className="w-4 h-4 mr-1" /> Configuré
+                    <IOSRow
+                        label="Catalogue"
+                        icon={<List className="w-[18px] h-[18px]" />}
+                        separator={true}
+                    >
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#34C759]">
+                            <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
                         </div>
                     </IOSRow>
-                    <IOSRow label="Équipe" separator={false}>
-                        <div className="flex items-center text-[#34C759] font-medium text-[15px]">
-                            <Check className="w-4 h-4 mr-1" /> Configuré
+                    <IOSRow
+                        label="Équipe"
+                        icon={<Users className="w-[18px] h-[18px]" />}
+                        separator={false}
+                    >
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#34C759]">
+                            <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />
                         </div>
                     </IOSRow>
                 </IOSSection>
@@ -153,9 +171,9 @@ export default function Step6ReadyPage() {
                 <div className="px-4">
                     <Button
                         onClick={handleLaunch}
-                        className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
+                        className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px] shadow-lg shadow-blue-500/20"
                     >
-                        {loading ? <Loader2 className="animate-spin mr-2" /> : "Accéder au Dashboard"}
+                        {loading ? <Loader2 className="animate-spin mr-2" /> : "Ouvrir mon établissement"}
                     </Button>
                 </div>
             </div>
