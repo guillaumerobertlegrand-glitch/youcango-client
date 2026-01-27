@@ -64,7 +64,11 @@ export default function Step3CatalogPage() {
 
         async function loadSpecialties() {
             const prefix = '56'; // Direct Restaurant Prefix for now
-            const { data } = await supabase.from('config_specialties').select('id, label').eq('industry_prefix', prefix);
+            const { data } = await supabase
+                .from('config_specialties')
+                .select('id, label_full, icon_name')
+                .eq('industry_prefix', prefix)
+                .order('display_order', { ascending: true });
             setSpecialties(data || []);
         }
         loadSpecialties();
@@ -182,7 +186,7 @@ export default function Step3CatalogPage() {
                                         selectedSpecialty ? "text-[#3C3C43]" : "text-[#8E8E93]"
                                     )}>
                                         {selectedSpecialty
-                                            ? specialties.find(s => s.id === selectedSpecialty)?.label
+                                            ? specialties.find(s => s.id === selectedSpecialty)?.label_full
                                             : "Choisir..."}
                                     </span>
                                     {/* Invisible Native Select for Interaction */}
@@ -193,7 +197,7 @@ export default function Step3CatalogPage() {
                                     >
                                         <option value="" disabled>Choisir...</option>
                                         {specialties.map(s => (
-                                            <option key={s.id} value={s.id}>{s.label}</option>
+                                            <option key={s.id} value={s.id}>{s.label_full}</option>
                                         ))}
                                     </select>
                                 </div>
