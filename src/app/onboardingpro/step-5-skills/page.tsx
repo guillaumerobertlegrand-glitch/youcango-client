@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { IOSSection, IOSRow } from "@/components/ui/ios-settings";
+import { cn } from "@/lib/utils";
 
 export default function Step5SkillsPage() {
     const supabase = createClient();
@@ -55,11 +57,8 @@ export default function Step5SkillsPage() {
             const { data: auths, error: errAuths } = await supabase.from('professional_service_authorizations')
                 .select('professional_id, service_id, authorized');
 
-            // If table missing, this throws. If auths is null, we default.
             if (errAuths) {
-                // Warn but maybe allow? No, critical.
                 console.error("Auth fetch error:", errAuths);
-                // If table missing error, prompt for migration? No, user can't do that.
             }
 
             const initialMatrix: Record<string, boolean> = {};
@@ -69,7 +68,7 @@ export default function Step5SkillsPage() {
                     servs.forEach(s => {
                         const key = `${p.id}_${s.id}`;
                         const existing = auths?.find(a => a.professional_id === p.id && a.service_id === s.id);
-                        // If record exists, use authorized val. Else true.
+                        // If record exists, use authorized val. Else true (default to enabled).
                         initialMatrix[key] = existing ? existing.authorized : true;
                     });
                 });
@@ -103,8 +102,6 @@ export default function Step5SkillsPage() {
                     professional_id: p.id,
                     service_id: s.id,
                     authorized: matrix[key], // Save explicit state
-                    // organization_id? Table might not have it if it's pure join. Usually join tables link 2 IDs.
-                    // Checking schema later, but standard is (pro_id, service_id).
                 });
             }
         }
@@ -125,10 +122,6 @@ export default function Step5SkillsPage() {
         const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 5, p_org_id: orgId });
 
         if (result && result.valid) {
-            // Advance to Step 6 (Ready)
-            // Need to update organization onboarding_step if we track it strictly?
-            // Since we added a step, 'step 5' is now Skills. 'step 6' is Ready.
-            // We need to ensure DB 'onboarding_step' updates to 6.
             await supabase.from('organizations').update({ onboarding_step: 6 }).eq('id', orgId);
             router.push("/onboardingpro/step-6-ready");
         } else {
@@ -137,66 +130,66 @@ export default function Step5SkillsPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-gray-500" /></div>;
 
     return (
-        <div className="flex flex-col min-h-full">
-            <div className="flex-grow p-4 space-y-6">
-                <header className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={() => router.push('/onboardingpro/step-4-team')} className="h-8 w-8 -ml-2">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-900">Compétences</h1>
-                        <p className="text-sm text-slate-500 mt-1">Qui fait quoi ?</p>
-                    </div>
+        <div className="h-full font-sans bg-[#F2F2F7] relative overflow-hidden flex flex-col">
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto pb-6">
+
+                {/* Header */}
+                <header className="mt-10 px-6 mb-2">
+                    <h1 className="text-[22px] font-bold text-black tracking-tight">
+                        Compétences
+                    </h1>
+                    <p className="text-[17px] text-[#000000] mt-2 leading-relaxed">
+                        Qui fait quoi ?
+                    </p>
                 </header>
 
-                <div className="grid gap-4">
-                    {team.map(member => (
-                        <div key={member.id} className="bg-white border text-left rounded-xl p-4 shadow-sm flex flex-col gap-4">
-                            <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${member.role === 'admin' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                    {member.first_name[0]}
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-slate-900">{member.first_name} {member.last_name}</div>
-                                    <div className="text-xs text-slate-400 capitalize bg-slate-50 inline-block px-1.5 py-0.5 rounded">{member.role}</div>
-                                </div>
+                {/* Member Sections */}
+                {team.map(member => (
+                    <IOSSection
+                        key={member.id}
+                        title={`${member.first_name} ${member.last_name} (${member.role === 'admin' ? 'Admin' : 'Membre'})`}
+                    >
+                        {services.length > 0 ? (
+                            services.map((service, idx) => {
+                                const isAuth = matrix[`${member.id}_${service.id}`];
+                                return (
+                                    <IOSRow
+                                        key={service.id}
+                                        label={service.designation}
+                                        separator={idx !== services.length - 1}
+                                        onClick={() => toggleAuth(member.id, service.id)}
+                                    >
+                                        {isAuth && <Check className="w-5 h-5 text-[#007AFF]" />}
+                                    </IOSRow>
+                                );
+                            })
+                        ) : (
+                            <div className="p-4 text-center text-gray-500 text-[15px]">
+                                Aucun service disponible.
                             </div>
+                        )}
+                    </IOSSection>
+                ))}
 
-                            <div className="flex flex-wrap gap-2">
-                                {services.map(service => {
-                                    const isAuth = matrix[`${member.id}_${service.id}`];
-                                    return (
-                                        <div
-                                            key={service.id}
-                                            onClick={() => toggleAuth(member.id, service.id)}
-                                            className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-medium border flex items-center gap-2 transition-all select-none
-                                                ${isAuth
-                                                    ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
-                                                    : 'bg-slate-50 border-slate-100 text-slate-400 opacity-70 grayscale'}`}
-                                        >
-                                            <div className={`w-4 h-4 rounded-full flex items-center justify-center ${isAuth ? 'bg-blue-500 text-white' : 'bg-slate-200'}`}>
-                                                {isAuth && <Check className="w-2.5 h-2.5" />}
-                                            </div>
-                                            {service.designation}
-                                        </div>
-                                    );
-                                })}
-                                {services.length === 0 && <span className="text-xs text-slate-400 italic">Aucun service défini.</span>}
-                            </div>
-                        </div>
-                    ))}
-                </div>
             </div>
 
             {/* Sticky Footer */}
-            <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 border-t border-slate-100 pb-8">
-                <Button onClick={handleNext} className="w-full h-12 text-base font-semibold shadow-xl shadow-slate-200" size="lg">
-                    Continuer
-                </Button>
+            <div className="shrink-0 z-10 relative mt-auto pb-6 pt-2 bg-[#F2F2F7]/80 backdrop-blur-md border-t border-[#C6C6C8]/30">
+                <div className="px-4">
+                    <Button
+                        onClick={handleNext}
+                        className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
+                    >
+                        {loading ? <Loader2 className="animate-spin mr-2" /> : "Continuer"}
+                    </Button>
+                </div>
             </div>
+
         </div>
     );
 }
