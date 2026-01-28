@@ -47,6 +47,8 @@ export async function POST(request: Request) {
 
         // 2. Trigger Auth Invite (Admin Client)
         const supabaseAdmin = createAdminClient();
+
+
         const { error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
                 role: role,
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
 
         if (authError) {
             console.error("Auth Invite Error:", authError);
+            console.log("DÉTAIL TECHNIQUE DE L'ERREUR (Auth):", authError);
             return NextResponse.json({
                 error: `Failed to send invitation email: ${authError.message}`
             }, { status: 500 });
@@ -68,6 +71,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error("API Error:", error);
+        console.log("DÉTAIL TECHNIQUE DE L'ERREUR :", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
