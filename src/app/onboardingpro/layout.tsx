@@ -19,9 +19,15 @@ export default async function OnboardingProLayout({
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Note: We don't strict redirect here because we might be in 'setup-password' or 'login' flow? 
-    // Actually /onboardingpro is protected.
-    if (!user) {
+    // Check for "setup-password" exception via headers (injected by middleware)
+    const { headers } = await import("next/headers");
+    const headerList = await headers();
+    const pathname = headerList.get("x-pathname") || "";
+
+    // Allow access to setup-password even without session (it handles its own auth via token)
+    const isSetupPassword = pathname.includes("/onboardingpro/setup-password");
+
+    if (!user && !isSetupPassword) {
         redirect("/login");
     }
 

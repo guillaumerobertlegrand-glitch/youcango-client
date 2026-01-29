@@ -25,7 +25,7 @@ export default function OnboardingDispatcher() {
 
                 const { data: pro } = await supabase
                     .from('professionals')
-                    .select('organization:organizations(onboarding_step)')
+                    .select('role, organization:organizations(onboarding_step)')
                     .eq('user_id', user.id)
                     .maybeSingle();
 
@@ -33,6 +33,15 @@ export default function OnboardingDispatcher() {
                     // Organization exists -> Redirect to Current Step
                     // @ts-ignore
                     const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
+
+                    // CHECK ROLE: If team_member, skip onboarding and go to Dashboard (Frame P1)
+                    // We assume 'role' column exists on 'professionals' table based on requirements
+                    // @ts-ignore
+                    if (pro.role === 'team_member') {
+                        router.push('/pro/active-session');
+                        return;
+                    }
+
                     const step = org.onboarding_step || 1;
 
                     const routes = {
@@ -40,7 +49,8 @@ export default function OnboardingDispatcher() {
                         2: '/onboardingpro/step-2-finance',
                         3: '/onboardingpro/step-3-catalog',
                         4: '/onboardingpro/step-4-team',
-                        5: '/onboardingpro/step-5-ready'
+                        5: '/onboardingpro/step-5-skills',
+                        6: '/onboardingpro/step-6-ready'
                     };
 
                     // @ts-ignore
