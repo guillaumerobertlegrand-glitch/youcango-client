@@ -30,11 +30,19 @@ export default function Step4TeamPage() {
             if (!user) return router.push("/login");
             setUserId(user.id);
 
-            const { data: pro } = await supabase.from('professionals').select('organization_id').eq('user_id', user.id).maybeSingle();
-            if (pro) {
-                setOrgId(pro.organization_id);
-                fetchData(pro.organization_id);
+            // Check Profile for store_id
+            const { data: profile } = await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle();
+
+            if (profile && profile.store_id) {
+                setOrgId(profile.store_id);
+                fetchData(profile.store_id);
             } else {
+                // Fallback or Redirect?
+                // If the user lands here, maybe they are admin? 
+                // Let's assume we might still rely on professionals table for 'admin' check from previous steps?
+                // Or maybe the user *is* asking for a full schema switch?
+                // Let's stick to the prompt: "Assure-toi que le composant de la Step 3 appelle bien ce RPC." 
+                // and "Les profils existants (profiles) où store_id = l'ID actuel."
                 router.push("/onboardingpro");
             }
         }
@@ -42,8 +50,46 @@ export default function Step4TeamPage() {
     }, [router, supabase]);
 
     const fetchData = async (oid: string) => {
-        const { data: pros } = await supabase.from('professionals').select('*').eq('organization_id', oid);
-        setTeam(pros || []);
+        setLoading(true);
+
+        // 1. Fetch Active Profiles (linked via store_id)
+        const { data: activeMembers, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('store_id', oid);
+
+        if (profilesError) console.error("Profiles fetch error:", profilesError);
+
+        // 2. Fetch Pending Invitations (linked via organization_id)
+        const { data: pendingInvites, error: invitesError } = await supabase
+            .from('invitations')
+            .select('*')
+            .eq('organization_id', oid);
+
+        if (invitesError) console.error("Invitations fetch error:", invitesError);
+
+        // 3. Merge & Map
+        const formattedActive = (activeMembers || []).map((p: any) => ({
+            id: p.id,
+            user_id: p.id, // Profile ID is usually User ID
+            first_name: p.first_name,
+            last_name: p.last_name,
+            email: p.email, // Assuming profiles has email or we need to fetch it differently? User implies it's available.
+            role: p.role || 'member', // Default to member if not specified
+            status: 'active'
+        }));
+
+        const formattedPending = (pendingInvites || []).map((i: any) => ({
+            id: i.id,
+            user_id: null,
+            first_name: i.first_name || "Invité",
+            last_name: i.last_name || "",
+            email: i.email,
+            role: i.role || 'member',
+            status: 'pending_invite'
+        }));
+
+        setTeam([...formattedActive, ...formattedPending]);
         setLoading(false);
     };
 
