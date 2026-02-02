@@ -30,19 +30,14 @@ export default function Step4TeamPage() {
             if (!user) return router.push("/login");
             setUserId(user.id);
 
-            // Check Profile for store_id
-            const { data: profile } = await supabase.from('profiles').select('store_id').eq('id', user.id).maybeSingle();
+            // 1. Check Professionals first (Source of Truth for Access/Org Link)
+            const { data: pro } = await supabase.from('professionals').select('organization_id').eq('user_id', user.id).maybeSingle();
 
-            if (profile && profile.store_id) {
-                setOrgId(profile.store_id);
-                fetchData(profile.store_id);
+            if (pro && pro.organization_id) {
+                setOrgId(pro.organization_id);
+                fetchData(pro.organization_id);
             } else {
-                // Fallback or Redirect?
-                // If the user lands here, maybe they are admin? 
-                // Let's assume we might still rely on professionals table for 'admin' check from previous steps?
-                // Or maybe the user *is* asking for a full schema switch?
-                // Let's stick to the prompt: "Assure-toi que le composant de la Step 3 appelle bien ce RPC." 
-                // and "Les profils existants (profiles) où store_id = l'ID actuel."
+                // Should not happen if Dispatcher sent us here, but safe fallback
                 router.push("/onboardingpro");
             }
         }
