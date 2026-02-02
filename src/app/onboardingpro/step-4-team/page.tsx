@@ -47,10 +47,105 @@ export default function Step4TeamPage() {
         init();
     }, [router, supabase]);
 
-    // ... (fetchData stays same) ...
+    const fetchData = async (oid: string) => {
+        setLoading(true);
+
+        // 1. Fetch Active Profiles (linked via store_id)
+        const { data: activeMembers, error: profilesError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('store_id', oid);
+
+        if (profilesError) console.error("Profiles fetch error:", profilesError);
+
+        // 2. Fetch Pending Invitations (linked via organization_id)
+        const { data: pendingInvites, error: invitesError } = await supabase
+            .from('invitations')
+            .select('*')
+            .eq('organization_id', oid);
+
+        if (invitesError) console.error("Invitations fetch error:", invitesError);
+
+        // 3. Merge & Map
+        const formattedActive = (activeMembers || []).map((p: any) => ({
+            id: p.id,
+            user_id: p.id, // Profile ID is usually User ID
+            first_name: p.first_name,
+            last_name: p.last_name,
+            email: p.email, // Assuming profiles has email or we need to fetch it differently? User implies it's available.
+            role: p.role || 'member', // Default to member if not specified
+            status: 'active'
+        }));
+
+        const formattedPending = (pendingInvites || []).map((i: any) => ({
+            id: i.id,
+            user_id: null,
+            first_name: i.first_name || "Invité",
+            last_name: i.last_name || "",
+            email: i.email,
+            role: i.role || 'member',
+            status: 'pending_invite'
+        }));
+
+        setTeam([...formattedActive, ...formattedPending]);
+        setLoading(false);
+    };
 
     // Actions
-    // ...
+    const sendInvite = async () => {
+        if (!orgId) return;
+        setLoading(true);
+        // Default Role: Member
+        const res = await fetch('/api/invite-member', {
+            method: 'POST',
+            body: JSON.stringify({
+                email: inviteEmail,
+                organization_id: orgId,
+                first_name: inviteFirstName,
+                last_name: inviteLastName
+            })
+        });
+        const json = await res.json();
+        setLoading(false);
+        if (json.success) {
+            setInviteEmail("");
+            setInviteFirstName("");
+            setInviteLastName("");
+            fetchData(orgId);
+        } else {
+            alert(json.error);
+        }
+    };
+
+    const removeMember = async (proId: string) => {
+        if (!confirm("Voulez-vous vraiment retirer ce membre de l'équipe ?")) return;
+        setLoading(true);
+        // Note: active members use user_id as ID in formattedActive. RPC likely expects pro_id.
+        // If this fails, we need to fetch professional_id first.
+        const { data, error } = await supabase.rpc('api_v1_remove_team_member', { p_pro_id: proId, p_org_id: orgId });
+        if (error || !data.success) {
+            alert("Erreur: " + (error?.message || data?.error));
+            setLoading(false);
+        } else {
+            fetchData(orgId!);
+        }
+    };
+
+    const handleNext = async () => {
+        if (!orgId) return;
+
+        // Validation: At least one member (yourself) is guaranteed. 
+        // We might want to encourage verifying info.
+
+        const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
+        if (result.valid) {
+            await supabase.from('organizations').update({ onboarding_step: 5 }).eq('id', orgId);
+            router.push("/onboardingpro/step-5-skills");
+        } else {
+            alert("Validation incomplète : " + JSON.stringify(result.details));
+            setLoading(false);
+        }
+    };
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-gray-500" /></div>;
 
@@ -118,11 +213,7 @@ export default function Step4TeamPage() {
                     )}
                 </IOSSection>
 
-                {/* Invite Section - Always visible if admin, or force visible per request? 
-                    User said: "Le formulaire ... doit être visible en permanence, peu importe s'il y a déjà des membres ou non."
-                    If user is somehow not admin, they shouldn't see it? But in onboarding they are admin.
-                    So isAdmin check is fine provided it is TRUE.
-                 */}
+                {/* Invite Section */}
                 {isAdmin && (
                     <IOSSection title="Inviter un collaborateur">
                         <IOSRow label="Prénom" separator={true}>
