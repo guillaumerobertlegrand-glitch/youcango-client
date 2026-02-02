@@ -519,7 +519,7 @@ export default function Step1IdentityPage() {
                     (!enrichmentConfirmed && (googleData || isManualSearch)) && (
                         <IOSSection
                             title="Suggestion Google Maps"
-                            className="mt-6"
+                            className="mt-2"
                             footer="Confirmez pour importer l'adresse et les horaires depuis Google."
                         >
 
@@ -591,7 +591,7 @@ export default function Step1IdentityPage() {
                                             }}
                                             className="py-3 text-[17px] text-[#007AFF] font-bold active:bg-[#F2F2F7] transition-colors border-b border-[#e5e5ea]"
                                         >
-                                            Oui, c'est mon établissement
+                                            Oui
                                         </button>
 
                                         <button
