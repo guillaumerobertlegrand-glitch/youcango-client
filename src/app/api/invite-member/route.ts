@@ -28,12 +28,14 @@ export async function POST(request: Request) {
         }
 
         // 1. Verify Permission & Create DB Record (RPC)
-        const { data: inviteData, error: inviteError } = await supabase.rpc('api_v1_invite_editor', {
+        // Default role is always 'member' for invitations now.
+        const targetRole = 'member';
+
+        const { data: inviteData, error: inviteError } = await supabase.rpc('api_v1_invite_member', {
             p_org_id: organization_id,
             p_email: email,
             p_first_name: first_name || "Invited",
-            p_last_name: last_name || "User",
-            p_role: role
+            p_last_name: last_name || "User"
         });
 
         if (inviteError) {
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
 
         const { error: authError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
             data: {
-                role: role,
+                role: targetRole,
                 organization_id: organization_id,
                 first_name: first_name,
                 last_name: last_name
