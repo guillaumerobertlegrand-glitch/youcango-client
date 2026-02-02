@@ -70,7 +70,7 @@ export default function Step2FinancePage() {
             await supabase.from('organizations').update({ onboarding_step: 3 }).eq('id', orgId);
             router.push("/onboardingpro/step-3-catalog");
         } else {
-            alert("Veuillez connecter votre compte Stripe pour continuer.");
+            // alert("Veuillez connecter votre compte Stripe pour continuer.");
             setLoading(false);
         }
     };
@@ -129,7 +129,14 @@ export default function Step2FinancePage() {
                 <div className="px-4">
                     <Button
                         onClick={handleNext}
-                        className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
+                        disabled={loading || !stripeConnected}
+                        className={`
+                            w-full h-[50px] text-[17px] font-semibold rounded-[16px] shadow-sm transition-all duration-200
+                            ${(loading || !stripeConnected)
+                                ? "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed" // Disabled Style
+                                : "bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" // Enabled Style
+                            }
+                        `}
                     >
                         Continuer
                     </Button>
