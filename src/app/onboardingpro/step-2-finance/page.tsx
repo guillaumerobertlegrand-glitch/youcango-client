@@ -15,12 +15,15 @@ export default function Step2FinancePage() {
     const [orgId, setOrgId] = useState<string | null>(null);
     const [stripeConnected, setStripeConnected] = useState(false);
 
+    const [userId, setUserId] = useState<string | null>(null);
+
     useEffect(() => {
         async function init() {
             try {
                 // Auth Check & Guard
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return router.push("/login");
+                setUserId(user.id);
 
                 const { data: pro } = await supabase
                     .from('professionals')
@@ -67,6 +70,20 @@ export default function Step2FinancePage() {
         // Allow bypass if valid OR if stripeConnected locally (for immediate feedback)
         // In real flow, validate_onboarding_step should check actual DB state
         if (result.valid || stripeConnected) {
+            // AUTOMATION: Link Profile and Set Admin Role
+            if (userId) {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({ store_id: orgId, role: 'admin' })
+                    .eq('id', userId);
+
+                if (profileError) {
+                    console.error("Profile Link Error:", profileError);
+                    // Optional: alert user? Or proceed silently? User wants it "propre".
+                    // If this fails, Step 3/4 won't work well.
+                }
+            }
+
             await supabase.from('organizations').update({ onboarding_step: 3 }).eq('id', orgId);
             router.push("/onboardingpro/step-3-catalog");
         } else {
