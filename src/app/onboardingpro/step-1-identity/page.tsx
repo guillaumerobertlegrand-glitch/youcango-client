@@ -301,16 +301,16 @@ export default function Step1IdentityPage() {
     const handleNext = async () => {
         setLoading(true);
 
-        // 1. Validate APE
+        // 1. Validate APE (Safety check, should be covered by disabled button)
         if (!isValidApe(apeCode)) {
-            alert("Activité non autorisée pour YouCanGo Pro (Restauration, Beauté, Garage uniquement).");
+            // alert("Activité non autorisée pour YouCanGo Pro (Restauration, Beauté, Garage uniquement).");
             setLoading(false);
             return;
         }
 
-        // 1.6 Validate Profile Fields
+        // 1.6 Validate Profile Fields (Safety check)
         if (!firstName || !lastName || !jobTitle || !commercialName) {
-            alert("Veuillez remplir toutes les informations.");
+            // alert("Veuillez remplir toutes les informations.");
             setLoading(false);
             return;
         }
@@ -398,6 +398,14 @@ export default function Step1IdentityPage() {
 
 
 
+    // Computed Validation State
+    const isFormValid =
+        isValidApe(apeCode) &&
+        firstName.trim().length > 0 &&
+        lastName.trim().length > 0 &&
+        jobTitle.trim().length > 0 &&
+        commercialName.trim().length > 0;
+
     return (
         <div className="flex flex-col h-full font-sans bg-[#F2F2F7] relative overflow-hidden">
             <div className="flex-1 pt-0 flex flex-col overflow-y-auto">
@@ -407,6 +415,7 @@ export default function Step1IdentityPage() {
                     title="Identité de l'établissement"
                     className="mt-6"
                 >
+                    {/* ... content ... */}
                     {/* SIRET */}
                     <IOSRow label="SIRET">
                         <div className="flex items-center gap-3 w-full justify-end">
@@ -501,13 +510,11 @@ export default function Step1IdentityPage() {
                 </IOSSection>
 
                 {/* Google Suggestion Section */}
-                {/* Google Suggestion Section */}
                 {!googleData && !enrichmentConfirmed && (
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 m-4 rounded-md">
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 m-4 rounded-md hidden">
                         <p className="text-yellow-700 text-sm">Etat: {isSearching ? "Recherche en cours..." : "En attente de Google..."} (UI Debug)</p>
                     </div>
                 )}
-                {/* Google Suggestion Section */}
                 {
                     (!enrichmentConfirmed && (googleData || isManualSearch)) && (
                         <IOSSection
@@ -552,10 +559,10 @@ export default function Step1IdentityPage() {
                                         </p>
                                     </div>
 
-                                    {googleData.photoUrl || true ? (
+                                    {googleData.photoUrl ? (
                                         /* eslint-disable-next-line @next/next/no-img-element */
                                         <img
-                                            src={googleData.photoUrl || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop"}
+                                            src={googleData.photoUrl}
                                             alt="Aperçu Etablissement"
                                             className="w-full h-[160px] object-cover bg-gray-100 mt-4"
                                         />
@@ -605,10 +612,10 @@ export default function Step1IdentityPage() {
 
                 {enrichmentConfirmed && (
                     <IOSSection className="mt-10" title="Données importées">
-                        {googleData?.photoUrl || true ? (
+                        {googleData?.photoUrl ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
-                                src={googleData.photoUrl || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop"}
+                                src={googleData.photoUrl}
                                 alt="Aperçu Etablissement"
                                 className="w-full h-[160px] object-cover bg-gray-100"
                             />
@@ -632,8 +639,14 @@ export default function Step1IdentityPage() {
             <div className="p-4 pb-6 w-full bg-[#F2F2F7] shrink-0 z-10 relative">
                 <Button
                     onClick={handleNext}
-                    disabled={loading}
-                    className="w-full h-[50px] bg-[#007AFF] hover:bg-[#005bb5] text-white text-[17px] font-semibold rounded-[16px] shadow-sm"
+                    disabled={loading || !isFormValid}
+                    className={`
+                        w-full h-[50px] text-[17px] font-semibold rounded-[16px] shadow-sm transition-all duration-200
+                        ${(loading || !isFormValid)
+                            ? "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed" // Disabled Style (Gray)
+                            : "bg-[#007AFF] hover:bg-[#005bb5] text-white" // Enabled Style (Blue)
+                        }
+                    `}
                 >
                     {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                     Continuer
