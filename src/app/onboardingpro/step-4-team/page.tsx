@@ -50,11 +50,11 @@ export default function Step4TeamPage() {
     const fetchData = async (oid: string) => {
         setLoading(true);
 
-        // 1. Fetch Active Profiles (linked via store_id)
+        // 1. Fetch Active Profiles (linked via organization_id)
         const { data: activeMembers, error: profilesError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('store_id', oid);
+            .eq('organization_id', oid);
 
         if (profilesError) console.error("Profiles fetch error:", profilesError);
 

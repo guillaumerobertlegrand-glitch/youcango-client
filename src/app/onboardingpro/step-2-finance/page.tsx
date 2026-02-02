@@ -74,7 +74,7 @@ export default function Step2FinancePage() {
             if (userId) {
                 const { error: profileError } = await supabase
                     .from('profiles')
-                    .update({ store_id: orgId, role: 'admin' })
+                    .update({ organization_id: orgId, role: 'admin' })
                     .eq('id', userId);
 
                 if (profileError) {

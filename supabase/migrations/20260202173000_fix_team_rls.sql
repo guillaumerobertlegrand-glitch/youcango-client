@@ -10,7 +10,7 @@
 CREATE POLICY "View team profiles" ON public.profiles
 FOR SELECT
 USING (
-    store_id IN (
+    organization_id IN (
         SELECT organization_id FROM public.professionals WHERE user_id = auth.uid()
     )
 );
