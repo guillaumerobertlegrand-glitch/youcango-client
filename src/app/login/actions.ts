@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 
 export async function login(formData: FormData) {
     const supabase = await createClient();
@@ -45,7 +46,7 @@ export async function signup(formData: FormData) {
         return redirect(`/login?error=${encodeURIComponent("Adresse email invalide. Veuillez vérifier le format.")}`);
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
     });
@@ -59,6 +60,35 @@ export async function signup(formData: FormData) {
             message = "Le mot de passe doit contenir au moins 6 caractères.";
         }
         return redirect(`/login?error=${encodeURIComponent(message)}`);
+    }
+
+    // Force create profile immediately (fix for missing trigger/RLS issues)
+    if (data?.user) {
+        try {
+            const admin = createAdminClient();
+
+            // Derive names from email
+            const namePart = email.split('@')[0];
+            // Split by dot, underscore or hyphen
+            const parts = namePart.split(/[._-]/);
+            const firstName = parts[0] || "New";
+            const lastName = parts.slice(1).join(" ") || "User";
+
+            // Upsert mainly to avoid race conditions if a trigger does exist
+            const { error: profileError } = await admin.from('profiles').upsert({
+                id: data.user.id,
+                first_name: firstName.charAt(0).toUpperCase() + firstName.slice(1),
+                last_name: lastName.charAt(0).toUpperCase() + lastName.slice(1),
+                role: 'member',
+                // organization_id left null initially
+            });
+
+            if (profileError) {
+                console.error("Profile Creation Failed:", profileError);
+            }
+        } catch (e) {
+            console.error("Profile Creation Exception:", e);
+        }
     }
 
     revalidatePath("/", "layout");
