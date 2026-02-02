@@ -15,6 +15,15 @@ export default function Step4TeamPage() {
     const [loading, setLoading] = useState(true);
     const [orgId, setOrgId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    // Data
+    const [team, setTeam] = useState<any[]>([]);
+
+    // Invite
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteFirstName, setInviteFirstName] = useState("");
+    const [inviteLastName, setInviteLastName] = useState("");
 
     useEffect(() => {
         async function init() {
