@@ -611,7 +611,7 @@ export default function Step1IdentityPage() {
                 }
 
                 {enrichmentConfirmed && (
-                    <IOSSection className="mt-10" title="Données importées">
+                    <IOSSection className="mt-2" title="Données importées">
                         {googleData?.photoUrl ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
