@@ -10,14 +10,11 @@ export default async function LoginPage(props: {
     const searchParams = await props.searchParams;
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-[#F5F5F7] p-6 font-sans">
+        <div className="flex flex-col items-center justify-start min-h-full bg-[#F5F5F7] p-6 pt-10 font-sans">
             <div className="w-full max-w-[400px] bg-white rounded-[24px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] p-10">
 
                 {/* Header */}
                 <div className="flex flex-col items-center space-y-4 mb-8">
-                    <div className="w-16 h-16 bg-[#007AFF] rounded-[18px] flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <Zap className="h-8 w-8 text-white fill-current" />
-                    </div>
                     <div className="text-center">
                         <h1 className="text-[28px] font-bold text-gray-900 tracking-tight leading-tight">YouCanGo</h1>
                         <p className="text-[17px] text-[#86868b] mt-1 font-normal">La passerelle IA vers le monde réel</p>
@@ -47,7 +44,7 @@ export default async function LoginPage(props: {
                                 type="email"
                                 placeholder="Email"
                                 required
-                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] focus-visible:ring-offset-0 transition-all font-normal"
+                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] md:text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] focus-visible:ring-offset-0 transition-all font-normal"
                             />
                             <Input
                                 id="password"
@@ -55,7 +52,7 @@ export default async function LoginPage(props: {
                                 type="password"
                                 placeholder="Mot de passe"
                                 required
-                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] focus-visible:ring-offset-0 transition-all font-normal"
+                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] md:text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] focus-visible:ring-offset-0 transition-all font-normal"
                             />
                         </div>
 

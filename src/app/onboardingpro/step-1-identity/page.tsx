@@ -74,7 +74,7 @@ export default function Step1IdentityPage() {
                     .maybeSingle();
 
                 if (proError) {
-                    console.error("DIAGNOSTIC ERROR:", proError);
+                    console.error("DIAGNOSTIC ERROR DETAILS:", JSON.stringify(proError, null, 2));
                 }
 
                 // Temporary Comment Out to isolate
@@ -122,7 +122,7 @@ export default function Step1IdentityPage() {
 
     // Helper: Simple matching score (0 to 1) 
     // Now prioritizes Address Overlap (Token-based)
-    const calculateMatchScore = (siretName: string, siretCity: string, googleName: string, googleAddress: string) => {
+    const calculateMatchScore = (siretName: string, siretCity: string, googleName: string, googleAddress: string, sAddressOverride?: string) => {
         const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ");
         const tokenize = (s: string) => new Set(normalize(s).split(/\s+/).filter(t => t.length > 1));
 
@@ -134,7 +134,7 @@ export default function Step1IdentityPage() {
         // We compare the Google Address vs (Street + City + Zip) from SIRET (which is usually in 'address' state + 'zip' logic)
         // Note: 'googleAddress' usually contains everything.
         // Let's compare googleAddress tokens with our 'address' state tokens (since 'address' comes from SIRET geo_adresse)
-        const sAddrTokens = tokenize(address + " " + (city || "")); // Use state city
+        const sAddrTokens = tokenize((sAddressOverride || address) + " " + (city || "")); // Use override or state city
         // We will trust the closure 'address' since it's the source.
         const gAddrTokens = tokenize(gAddress);
 
@@ -161,70 +161,40 @@ export default function Step1IdentityPage() {
         return score;
     };
 
-    // Google Places Search
-    const searchGooglePlace = async (query: string, checkAddress: string, checkCity: string, isRetry = false) => {
+    // Google Places Search (Unified)
+    const searchGooglePlace = async (arg: string | { lat: number, lng: number, names: string[], naf: string }) => {
         try {
-            console.log("Searching Google with:", query);
+            console.log("Searching Google with:", arg);
+
+            let payload: any = {};
+
+            if (typeof arg === 'string') {
+                // Manual Text Search
+                payload = { query: arg };
+            } else {
+                // Strict Auto Search
+                payload = {
+                    lat: arg.lat,
+                    lng: arg.lng,
+                    names: arg.names,
+                    naf: arg.naf
+                };
+            }
+
             const res = await fetch('/api/google-places', {
                 method: 'POST',
-                body: JSON.stringify({ query }),
+                body: JSON.stringify(payload),
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await res.json();
 
             if (data.found) {
-                // ZERO NOISE: Confidence Check
-                // We compare the Google result with our SIRET data to be sure.
-                // If we don't have enough confidence, we stay silent.
-
-                // Extract City from raw address if needed, currently we use the 'address' state which comes from SIRET usually
-                // But specifically we want to compare with the 'city' variable from searchSiret scope if possible.
-                // However, 'city' is local to searchSiret. We verify against the state `address` (which contains city usually)
-                // or better, we can assume the query construction was correct.
-
-                // Let's rely on the text match for now using the state variables.
-                // Note: 'commercialName', 'officialName' and 'address' are set.
-
-                // ZERO NOISE: Simplified France Logic
-                // We use global state 'address' which contains the full address from SIRET
-                // ZERO NOISE: Simplified France Logic
-                // We use explicitly passed address/city to avoid async state issues
-                const score = calculateMatchScore("", checkCity, "", data.address);
-
-                // Also verify against checkAddress if needed, but the helper uses global 'address' state.
-                // WAIT! Helper uses global 'address' state which is STALE.
-                // We must update calculateMatchScore or patch it here.
-                // Actually calculateMatchScore uses 'address' (state) and 'siretCity' (arg).
-                // We need to fix calculateMatchScore usage. 
-                // Let's create a local specialized check here or update helper.
-                // Better: update helper to accept address as arg.
-                // But helper is defined elsewhere.
-                // Let's just fix the helper call to use 'checkAddress' via a temporary override or changing helper signature?
-                // Changing helper signature is cleaner. 
-                // But for now, let's just do the check inline or assume the helper can take 'checkAddress' if we change it.
-                // Let's change helper signature in next chunk.
-
-                // Assuming helper updated to: calculateMatchScore(name, city, gName, gAddress, sAddressOverride)
-                // Or just: calculateMatchScore("", checkCity, "", data.address, checkAddress);
-
-                // Let's Refactor Helper below. For now, calling with expected signature.
-                const realScore = calculateMatchScore("", checkCity, "", data.address, checkAddress);
-
-                // VALIDATION UX
-                if (score === 1) {
-                    setGoogleData(data);
-                    setIsManualSearch(false);
-                } else {
-                    setGoogleData(null); // Score 0 -> Silent
-                }
-                // Note: we might need partial match since 'address' state might be full string.
-
-                // (Logic moved inside Step 186-196 block)
-                // Silent Fallback
+                setGoogleData(data);
+                setIsManualSearch(false);
+            } else {
                 setGoogleData(null);
             }
         } catch (e) {
-            // Silent catch
             setGoogleData(null);
         }
     };
@@ -254,47 +224,60 @@ export default function Step1IdentityPage() {
                 if (!commercialName) setCommercialName(cleanOfficialName); // Pre-fill if empty
                 setApeCode(result.activite_principale || "");
 
-                // Capture Location
-                const rawAddress = result.siege?.geo_adresse || result.siege?.adresse || "Adresse inconnue";
+                // Capture Location (Prioritize matching establishment if SIRET search)
+                // specific SIRET match usually appears in matching_etablissements
+                const establishment = result.matching_etablissements?.[0] || result.siege;
+
+                const rawAddress = establishment?.geo_adresse || establishment?.adresse || "Adresse inconnue";
                 setAddress(rawAddress);
-                const city = result.siege?.libelle_commune || "";
-                const zip = result.siege?.code_postal || "";
+                const city = establishment?.libelle_commune || "";
+                const zip = establishment?.code_postal || "";
                 setCity(city);
                 setZip(zip);
 
                 let foundLat = 48.8566;
                 let foundLong = 2.3522;
-                if (result.siege?.latitude) {
-                    foundLat = parseFloat(result.siege.latitude);
+                if (establishment?.latitude) {
+                    foundLat = parseFloat(establishment.latitude);
                     setLat(foundLat);
                 }
-                if (result.siege?.longitude) {
-                    foundLong = parseFloat(result.siege.longitude);
+                if (establishment?.longitude) {
+                    foundLong = parseFloat(establishment.longitude);
                     setLong(foundLong);
                 }
 
                 setSearchError(null);
 
-                // MOCK DATA INJECTION (FORCED VALIDATION)
-                console.log("=== INJECTION MOCK DATA AG 2026 ===");
-                setGoogleData({
-                    found: true,
-                    place_id: "mock_vieux_comptoir",
-                    name: "AU VIEUX COMPTOIR",
-                    address: "19 Rue Danielle Casanova, 75001 Paris, France",
-                    lat: 48.868,
-                    lng: 2.331,
-                    photoUrl: "https://lh3.googleusercontent.com/p/AF1QipN_X_Y_X_Y_X_Y" // Placeholder or valid URL if possible, using a safe placeholder for now or the one user gave if full. User gave "https://lh3.googleusercontent.com/p/AF1QipN..." which is incomplete. I will use a reliable placeholder.
-                    // Actually user said: "https://via.placeholder.com/400x160" in previous prompt, or "https://lh3..." in this one. I will use a nice placeholder.
-                });
-                // Override photoUrl with a real visuals for "Premium" feel if possible, or use the placeholder.
-                // Let's use a placeholder that looks like a shop.
-                // But setGoogleData expects the object.
-                // I will use the user's specific text: "AU VIEUX COMPTOIR"
+                // Match with Google Place if possible
+                // STRICT LOGIC 2026: Geo + NAF + Fuzzy + Fallback
 
-                // Also trigger real search in background just in case, but Mock takes precedence for UI check
-                // searchGooglePlace(...) -> We disable it to avoid overriding the Mock if it fails.
+                // LOG 0: Raw SIRET Data (Frontend)
+                console.log("LOG 0 [SIRET RAW FRONT]:", result);
 
+                if (foundLat && foundLong) {
+
+                    // Extract Enseignes correctly (Array)
+                    // Note: result.matching_etablissements?.[0] is 'establishment' variable
+                    const enseignes = establishment?.liste_enseignes || [];
+
+                    // Exhaustive Name Collection
+                    // We map everything to string array and flattening if needed
+                    const allNames = [
+                        result.nom_complet,
+                        result.nom_raison_sociale,
+                        establishment?.denomination_usuelle,
+                        ...enseignes, // Spread array
+                        commercialName
+                    ].filter(Boolean); // Clean empty
+
+                    searchGooglePlace({
+                        lat: foundLat,
+                        lng: foundLong,
+                        names: [...new Set(allNames)], // Dedup
+                        naf: result.activite_principale,
+                        address: rawAddress // Pass exact address for fallback
+                    });
+                }
             } else {
                 setSearchError("Aucune entreprise trouvée.");
             }
@@ -415,7 +398,7 @@ export default function Step1IdentityPage() {
     // Loading check
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-slate-400" /></div>;
 
-    console.log("=== UI RENDER CHECK ===", googleData);
+
 
     return (
         <div className="flex flex-col h-full font-sans bg-[#F2F2F7] relative overflow-hidden">
@@ -526,11 +509,12 @@ export default function Step1IdentityPage() {
                         <p className="text-yellow-700 text-sm">Etat: {isSearching ? "Recherche en cours..." : "En attente de Google..."} (UI Debug)</p>
                     </div>
                 )}
+                {/* Google Suggestion Section */}
                 {
                     (!enrichmentConfirmed && (googleData || isManualSearch)) && (
                         <IOSSection
                             title="Suggestion Google Maps"
-                            className="mt-10" // Added spacing
+                            className="mt-6"
                             footer="Confirmez pour importer l'adresse et les horaires depuis Google."
                         >
 
@@ -544,11 +528,11 @@ export default function Step1IdentityPage() {
                                                 value={manualQuery}
                                                 onChange={e => setManualQuery(e.target.value)}
                                                 onKeyDown={e => {
-                                                    if (e.key === 'Enter') searchGooglePlace(manualQuery, "", ""); // Manual search has no context validation
+                                                    if (e.key === 'Enter') searchGooglePlace(manualQuery); // Manual
                                                 }}
                                             />
                                             <button
-                                                onClick={() => searchGooglePlace(manualQuery, "", "")}
+                                                onClick={() => searchGooglePlace(manualQuery)}
                                                 className="text-[17px] text-[#007AFF] font-medium ml-2"
                                             >
                                                 OK
@@ -564,19 +548,22 @@ export default function Step1IdentityPage() {
                                 </div>
                             ) : (
                                 <>
-                                    {googleData.photoUrl || true ? ( // FORCE PHOTO DISPLAY (Mock or Real)
+                                    <div className="p-3 bg-[#F2F2F7] mx-4 mt-4 rounded-lg">
+                                        <p className="text-[15px] text-[#3C3C43] text-center font-medium">
+                                            Est-ce bien votre établissement ?
+                                        </p>
+                                    </div>
+
+                                    {googleData.photoUrl || true ? (
                                         /* eslint-disable-next-line @next/next/no-img-element */
                                         <img
-                                            src={googleData.photoUrl || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop"} // Use nice placeholder if empty
+                                            src={googleData.photoUrl || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=1000&auto=format&fit=crop"}
                                             alt="Aperçu Etablissement"
-                                            className="w-full h-[160px] object-cover bg-gray-100" // rounded-t handled by Section? No, section usually clips content.
+                                            className="w-full h-[160px] object-cover bg-gray-100 mt-4"
                                         />
-                                    ) : (
-                                        <div className="w-full h-[160px] bg-gray-100 flex items-center justify-center text-gray-400">
-                                            <span className="text-[13px]">Pas d'image disponible</span>
-                                        </div>
-                                    )}
-                                    <div className="p-4 flex gap-4">
+                                    ) : null}
+
+                                    <div className="p-4 flex gap-4 border-b border-[#e5e5ea]">
                                         <div className="w-[45px] h-[45px] rounded-lg border border-[#e5e5ea] overflow-hidden shrink-0">
                                             <div className="w-full h-full bg-[#f0f0f5] flex items-center justify-center">
                                                 <MapPin className="text-[#007AFF]" size={24} />
@@ -585,23 +572,11 @@ export default function Step1IdentityPage() {
                                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                                             <h4 className="font-semibold text-[17px] text-black truncate leading-tight">{googleData.name}</h4>
                                             <p className="text-[13px] text-[#8E8E93] line-clamp-1 leading-tight mt-0.5">{googleData.address}</p>
-
-                                            {/* Matches not perfect? Manual Link */}
-                                            <button
-                                                onClick={() => { setIsManualSearch(true); setManualQuery(""); }}
-                                                className="text-left text-[13px] text-[#007AFF] mt-1 font-medium"
-                                            >
-                                                Non, ce n'est pas moi
-                                            </button>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 border-t border-[#e5e5ea] divide-x divide-[#e5e5ea]">
-                                        <button
-                                            onClick={() => setGoogleData(null)}
-                                            className="py-3 text-[17px] text-[#007AFF] font-normal active:bg-[#F2F2F7] transition-colors"
-                                        >
-                                            Ignorer
-                                        </button>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-col">
                                         <button
                                             onClick={() => {
                                                 if (googleData.lat) setLat(googleData.lat);
@@ -609,15 +584,20 @@ export default function Step1IdentityPage() {
                                                 if (googleData.address) setAddress(googleData.address);
                                                 setEnrichmentConfirmed(true);
                                             }}
-                                            className="py-3 text-[17px] text-[#007AFF] font-semibold active:bg-[#F2F2F7] transition-colors"
+                                            className="py-3 text-[17px] text-[#007AFF] font-bold active:bg-[#F2F2F7] transition-colors border-b border-[#e5e5ea]"
                                         >
-                                            Confirmer
+                                            Oui, c'est mon établissement
                                         </button>
-                                    </div>
-                                    <div className="p-3 bg-[#F2F2F7] mx-4 mb-4 rounded-lg">
-                                        <p className="text-[13px] text-[#3C3C43]">
-                                            Nous avons trouvé <strong>{googleData.name}</strong> à cette adresse. Est-ce votre établissement ?
-                                        </p>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsManualSearch(true);
+                                                setManualQuery("");
+                                            }}
+                                            className="py-3 text-[17px] text-[#007AFF] font-normal active:bg-[#F2F2F7] transition-colors"
+                                        >
+                                            Non, rechercher un autre établissement
+                                        </button>
                                     </div>
                                 </>
                             )}

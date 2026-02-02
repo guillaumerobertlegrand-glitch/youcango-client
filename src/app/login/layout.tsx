@@ -30,7 +30,7 @@ export default function LoginLayout({
 
                 {/* Header (Simplified) */}
                 <header className="flex-shrink-0 z-40 bg-white/80 backdrop-blur-md pt-4 pb-4 px-6 border-b border-slate-100">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-start">
                         <h1 className="text-xl font-black tracking-tighter text-slate-900">YouCanGo <span className="text-slate-400">Pro</span></h1>
                     </div>
                 </header>

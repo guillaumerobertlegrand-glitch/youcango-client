@@ -209,3 +209,15 @@
     @apply bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl;
   }
 }
+
+/* Force Autofill Font Size */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #1d1d1f !important;
+  -webkit-box-shadow: 0 0 0px 1000px #F5F5F7 inset !important;
+  box-shadow: 0 0 0px 1000px #F5F5F7 inset !important;
+  background-color: #F5F5F7 !important;
+  font-size: 17px !important;
+}

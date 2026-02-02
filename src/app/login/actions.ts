@@ -18,7 +18,13 @@ export async function login(formData: FormData) {
 
     if (error) {
         console.error("Login Error:", error);
-        return redirect(`/login?error=${encodeURIComponent(error.message)}`);
+        let message = error.message;
+        if (message === "Invalid login credentials") {
+            message = "Identifiants incorrects. Veuillez vérifier votre email et mot de passe.";
+        } else if (message === "Email not confirmed") {
+            message = "Veuillez confirmer votre email avant de vous connecter.";
+        }
+        return redirect(`/login?error=${encodeURIComponent(message)}`);
     }
 
     revalidatePath("/", "layout");
@@ -46,7 +52,13 @@ export async function signup(formData: FormData) {
 
     if (error) {
         console.error("Signup Error:", error);
-        return redirect(`/login?error=${encodeURIComponent(error.message)}`);
+        let message = error.message;
+        if (message === "User already registered") {
+            message = "Un compte existe déjà avec cet email.";
+        } else if (message === "Password should be at least 6 characters") {
+            message = "Le mot de passe doit contenir au moins 6 caractères.";
+        }
+        return redirect(`/login?error=${encodeURIComponent(message)}`);
     }
 
     revalidatePath("/", "layout");
