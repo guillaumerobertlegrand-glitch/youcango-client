@@ -162,7 +162,7 @@ export default function Step1IdentityPage() {
     };
 
     // Google Places Search (Unified)
-    const searchGooglePlace = async (arg: string | { lat: number, lng: number, names: string[], naf: string }) => {
+    const searchGooglePlace = async (arg: string | { lat: number, lng: number, names: string[], naf: string, address?: string }) => {
         try {
             console.log("Searching Google with:", arg);
 
@@ -177,7 +177,8 @@ export default function Step1IdentityPage() {
                     lat: arg.lat,
                     lng: arg.lng,
                     names: arg.names,
-                    naf: arg.naf
+                    naf: arg.naf,
+                    address: arg.address
                 };
             }
 
@@ -250,9 +251,6 @@ export default function Step1IdentityPage() {
 
                 // Match with Google Place if possible
                 // STRICT LOGIC 2026: Geo + NAF + Fuzzy + Fallback
-
-                // LOG 0: Raw SIRET Data (Frontend)
-                console.log("LOG 0 [SIRET RAW FRONT]:", result);
 
                 if (foundLat && foundLong) {
 

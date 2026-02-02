@@ -84,8 +84,6 @@ export async function POST(req: Request) {
         // We use radius 150m to be very precise as requested.
         const radius = 150;
         // LOG 1: URL (Masked)
-        const urlMasked = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&language=fr`;
-        console.log("LOG 1 [GooglePlaces] URL:", urlMasked);
 
         const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&key=${apiKey}&language=fr`;
 
@@ -93,14 +91,10 @@ export async function POST(req: Request) {
         const data = await res.json();
 
         if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-            console.log("LOG 1 [GooglePlaces] Error/Empty:", data.status);
             return NextResponse.json({ found: false, reason: 'No places nearby' });
         }
 
         let candidates = data.results;
-
-        // LOG 2: Raw Candidates
-        console.log("LOG 2 [GooglePlaces] Raw Candidates:", candidates.map((c: any) => c.name));
 
         // 2. BUSINESS FILTER (NAF)
         if (naf) {
@@ -112,8 +106,6 @@ export async function POST(req: Request) {
                 return place.types.some((t: string) => allowedTypes.has(t));
             });
 
-            console.log(`LOG 2b [GooglePlaces] After NAF Filter (${naf} -> ${Array.from(allowedTypes).join(',')}):`, filtered.map((c: any) => c.name));
-
             // Should we start strictly? Or fall back if filter is too aggressive?
             // User said: "Dans cette liste... ne garde que ceux..." -> Strict.
             if (filtered.length > 0) {
@@ -122,7 +114,6 @@ export async function POST(req: Request) {
                 // Optional: if filtered returns empty, maybe we should relax or just return nothing?
                 // "Simple & Robuste" -> If type mismatch, likely not the right place or NAF mapping issue.
                 // Let's keep strict for now, but log it.
-                console.log(`[GooglePlaces] Strict NAF filter removed all candidates for NAF ${naf}`);
                 // Fallback strategy: if we kill everyone, maybe we keep original list if we trust the Geo?
                 // User instruction is explicit: "ne garde que ceux..."
                 // So we return not found? Or we iterate?
@@ -142,7 +133,6 @@ export async function POST(req: Request) {
         // 3. FUZZY MATCH MULTI-FIELDS
         // Compare candidates with provided names
         const targetNames: string[] = Array.isArray(names) ? names.filter(Boolean) : [];
-        console.log("LOG 3 [GooglePlaces] Target Names:", targetNames);
 
         let bestCandidate = null;
         let bestScore = 0;
@@ -155,8 +145,6 @@ export async function POST(req: Request) {
                 const score = getSimilarity(tName, gName);
                 if (score > maxScoreForCandidate) maxScoreForCandidate = score;
             }
-
-            console.log(`LOG 3 [GooglePlaces] Score for '${gName}': ${maxScoreForCandidate.toFixed(2)}`);
 
             candidate._matchScore = maxScoreForCandidate;
 
@@ -173,7 +161,6 @@ export async function POST(req: Request) {
 
         if (needsFallback) {
             const fallbackQuery = `${targetNames[0]} ${address}`;
-            console.log(`LOG 4 [GooglePlaces] Low Confidence (${bestScore.toFixed(2)} < 0.8). triggering Fallback TextSearch: "${fallbackQuery}"`);
 
             const fallbackUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(fallbackQuery)}&key=${apiKey}&language=fr`;
             const fbRes = await fetch(fallbackUrl);
@@ -181,7 +168,6 @@ export async function POST(req: Request) {
 
             if (fbData.status === 'OK' && fbData.results && fbData.results.length > 0) {
                 const fbCandidate = fbData.results[0];
-                console.log(`LOG 4b [GooglePlaces] Fallback found: ${fbCandidate.name} (${fbCandidate.formatted_address})`);
 
                 // Score it (Just for info, we trust it because of address match intent)
                 let fbScore = 0;
@@ -190,14 +176,11 @@ export async function POST(req: Request) {
                     const score = getSimilarity(tName, gName);
                     if (score > fbScore) fbScore = score;
                 }
-                console.log(`LOG 4c [GooglePlaces] Fallback Score: ${fbScore.toFixed(2)}`);
 
                 // Accept it as bestCandidate
                 bestCandidate = fbCandidate;
                 bestScore = Math.max(bestScore, fbScore || 0.8); // Artificially boost score if needed or just use max to pass threshold
                 if (fbScore < 0.3) bestScore = 0.8; // Force pass if we trust the address fallback
-            } else {
-                console.log("LOG 4b [GooglePlaces] Fallback returned no results.");
             }
         }
 
