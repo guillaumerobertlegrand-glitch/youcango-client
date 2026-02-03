@@ -20,6 +20,9 @@ export default function Step4TeamPage() {
     // Data
     const [team, setTeam] = useState<any[]>([]);
 
+    const [myFirstName, setMyFirstName] = useState("");
+    const [myLastName, setMyLastName] = useState("");
+
     // Invite
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteFirstName, setInviteFirstName] = useState("");
@@ -31,21 +34,45 @@ export default function Step4TeamPage() {
             if (!user) return router.push("/login");
             setUserId(user.id);
 
-            // 1. Check Professionals first (Source of Truth for Access/Org Link)
-            const { data: pro } = await supabase.from('professionals').select('organization_id, role').eq('user_id', user.id).maybeSingle();
+            // 1. Fetch Profile for Name Pre-fill & Access Check (Source of Truth for Org Link via organization_id)
+            const { data: profile } = await supabase.from('profiles')
+                .select('first_name, last_name, organization_id, role')
+                .eq('id', user.id)
+                .maybeSingle();
 
-            if (pro && pro.organization_id) {
-                setOrgId(pro.organization_id);
-                // Assume admin if they are here in onboarding flow, or strict check
-                setIsAdmin(pro.role === 'admin');
-                fetchData(pro.organization_id);
+            if (profile) {
+                setMyFirstName(profile.first_name || "");
+                setMyLastName(profile.last_name || "");
+
+                if (profile.organization_id) {
+                    setOrgId(profile.organization_id);
+                    setIsAdmin(profile.role === 'admin');
+                    fetchData(profile.organization_id);
+                } else {
+                    // Fallback using Professionals table if profile link missing (legacy safety)
+                    const { data: pro } = await supabase.from('professionals').select('organization_id, role').eq('user_id', user.id).maybeSingle();
+                    if (pro && pro.organization_id) {
+                        setOrgId(pro.organization_id);
+                        setIsAdmin(pro.role === 'admin');
+                        fetchData(pro.organization_id);
+                    } else {
+                        router.push("/onboardingpro");
+                    }
+                }
             } else {
-                // Should not happen if Dispatcher sent us here, but safe fallback
                 router.push("/onboardingpro");
             }
         }
         init();
     }, [router, supabase]);
+
+    const saveMyProfile = async () => {
+        if (!userId) return;
+        await supabase.from('profiles').update({
+            first_name: myFirstName,
+            last_name: myLastName
+        }).eq('id', userId);
+    };
 
     const fetchData = async (oid: string) => {
         setLoading(true);
@@ -95,6 +122,7 @@ export default function Step4TeamPage() {
     const sendInvite = async () => {
         if (!orgId) return;
         setLoading(true);
+        await saveMyProfile(); // Autosave self info
         // Default Role: Member
         const res = await fetch('/api/invite-member', {
             method: 'POST',
@@ -133,6 +161,7 @@ export default function Step4TeamPage() {
 
     const handleNext = async () => {
         if (!orgId) return;
+        await saveMyProfile(); // Autosave self info
 
         // Validation: At least one member (yourself) is guaranteed. 
         // We might want to encourage verifying info.
@@ -167,6 +196,26 @@ export default function Step4TeamPage() {
                         Gérez les membres de votre établissement.
                     </p>
                 </header>
+
+                {/* My Info */}
+                <IOSSection title="Vos Informations">
+                    <IOSRow label="Votre Prénom" separator={true}>
+                        <input
+                            className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
+                            placeholder="Requis"
+                            value={myFirstName}
+                            onChange={e => setMyFirstName(e.target.value)}
+                        />
+                    </IOSRow>
+                    <IOSRow label="Votre Nom">
+                        <input
+                            className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
+                            placeholder="Requis"
+                            value={myLastName}
+                            onChange={e => setMyLastName(e.target.value)}
+                        />
+                    </IOSRow>
+                </IOSSection>
 
                 {/* Team List */}
                 <IOSSection title="Membres">
@@ -261,7 +310,7 @@ export default function Step4TeamPage() {
                 <div className="px-4">
                     <Button
                         onClick={handleNext}
-                        disabled={loading}
+                        disabled={loading || !myFirstName || !myLastName}
                         className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
                     >
                         {loading ? <Loader2 className="animate-spin mr-2" /> : "Continuer"}
