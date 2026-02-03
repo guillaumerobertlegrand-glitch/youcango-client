@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Check, Zap } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -114,7 +114,7 @@ function SetupPasswordContent() {
 
     if (status === 'success') {
         return (
-            <div className="min-h-screen flex flex-col justify-center items-center bg-[#F5F5F7] p-6 font-sans">
+            <div className="min-h-screen flex flex-col items-center bg-[#F5F5F7] p-6 font-sans pt-12">
                 <div className="bg-white p-10 rounded-[24px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] max-w-[400px] w-full text-center space-y-8 animate-in fade-in zoom-in duration-300">
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
                         <Check className="w-10 h-10 text-green-600" strokeWidth={3} />
@@ -123,7 +123,7 @@ function SetupPasswordContent() {
                         <h1 className="text-[28px] font-medium text-gray-900 tracking-tight">Compte activé</h1>
                     </div>
                     <Button
-                        onClick={() => router.push("/onboardingpro/welcome")}
+                        onClick={() => router.push("/pro")}
                         className="w-full h-[50px] bg-[#007AFF] hover:bg-[#0071EB] text-white font-medium text-[17px] rounded-[14px] shadow-sm transition-all"
                     >
                         Accéder à mon espace
@@ -134,14 +134,11 @@ function SetupPasswordContent() {
     }
 
     return (
-        <div className="min-h-screen flex flex-col justify-center items-center bg-[#F5F5F7] p-6 font-sans">
+        <div className="min-h-screen flex flex-col items-center bg-[#F5F5F7] p-6 font-sans pt-12">
             <div className="bg-white p-10 rounded-[24px] shadow-[0_10px_40px_rgba(0,0,0,0.08)] max-w-[400px] w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 {/* Header */}
                 <div className="flex flex-col items-center space-y-4 mb-8">
-                    <div className="w-16 h-16 bg-[#007AFF] rounded-[18px] flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <Zap className="h-8 w-8 text-white fill-current" />
-                    </div>
                     <div className="text-center">
                         <h1 className="text-[24px] font-medium text-gray-900 tracking-tight">Créer votre mot de passe</h1>
                     </div>
