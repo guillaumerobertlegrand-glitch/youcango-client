@@ -46,6 +46,8 @@ export default function Step1IdentityPage() {
     const [lastName, setLastName] = useState("");
     const [jobTitle, setJobTitle] = useState("");
 
+    const [userId, setUserId] = useState<string | null>(null);
+
     // Initialization
     useEffect(() => {
         async function init() {
@@ -53,6 +55,7 @@ export default function Step1IdentityPage() {
                 // Auth Check
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return router.push("/login");
+                setUserId(user.id);
 
                 // Get User Profile (for bootstrap)
                 const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
@@ -344,6 +347,19 @@ export default function Step1IdentityPage() {
             }
 
             const newOrgId = data.organization_id;
+
+            // CRITICAL: Link Profile and Save Identity IMMEDIATELY
+            if (userId) {
+                const { error: profileError } = await supabase.from('profiles').update({
+                    first_name: firstName,
+                    last_name: lastName,
+                    organization_id: newOrgId,
+                    role: 'admin' // Force admin role here too
+                }).eq('id', userId);
+
+                if (profileError) console.error("Profile Link Error:", profileError);
+            }
+
             await validateStep(newOrgId);
 
         } else {
@@ -361,6 +377,15 @@ export default function Step1IdentityPage() {
                 alert("Erreur Update Org: " + orgError.message);
                 setLoading(false);
                 return;
+            }
+
+            // CRITICAL: Update Profile Identity on Edit too
+            if (userId) {
+                await supabase.from('profiles').update({
+                    first_name: firstName,
+                    last_name: lastName,
+                    organization_id: orgId
+                }).eq('id', userId);
             }
 
             // Also update Pro Profile on edit

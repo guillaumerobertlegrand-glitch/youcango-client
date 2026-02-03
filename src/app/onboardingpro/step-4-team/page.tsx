@@ -122,7 +122,6 @@ export default function Step4TeamPage() {
     const sendInvite = async () => {
         if (!orgId) return;
         setLoading(true);
-        await saveMyProfile(); // Autosave self info
         // Default Role: Member
         const res = await fetch('/api/invite-member', {
             method: 'POST',
@@ -161,7 +160,6 @@ export default function Step4TeamPage() {
 
     const handleNext = async () => {
         if (!orgId) return;
-        await saveMyProfile(); // Autosave self info
 
         // Validation: At least one member (yourself) is guaranteed. 
         // We might want to encourage verifying info.
@@ -196,26 +194,6 @@ export default function Step4TeamPage() {
                         Gérez les membres de votre établissement.
                     </p>
                 </header>
-
-                {/* My Info */}
-                <IOSSection title="Vos Informations">
-                    <IOSRow label="Votre Prénom" separator={true}>
-                        <input
-                            className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
-                            placeholder="Requis"
-                            value={myFirstName}
-                            onChange={e => setMyFirstName(e.target.value)}
-                        />
-                    </IOSRow>
-                    <IOSRow label="Votre Nom">
-                        <input
-                            className="w-full text-right bg-transparent outline-none text-[17px] text-[#3C3C43] placeholder:text-[#C7C7CC]"
-                            placeholder="Requis"
-                            value={myLastName}
-                            onChange={e => setMyLastName(e.target.value)}
-                        />
-                    </IOSRow>
-                </IOSSection>
 
                 {/* Team List */}
                 <IOSSection title="Membres">
@@ -310,7 +288,7 @@ export default function Step4TeamPage() {
                 <div className="px-4">
                     <Button
                         onClick={handleNext}
-                        disabled={loading || !myFirstName || !myLastName}
+                        disabled={loading}
                         className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
                     >
                         {loading ? <Loader2 className="animate-spin mr-2" /> : "Continuer"}
