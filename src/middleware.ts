@@ -2,6 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+    // CRITICAL: Bypass middleware completely for the callback route AND setup-password to allow Client-Side Hash handling / Transition
+    if (request.nextUrl.pathname.startsWith('/auth/callback') || request.nextUrl.pathname.startsWith('/onboardingpro/setup-password')) {
+        return NextResponse.next();
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -33,7 +38,10 @@ export async function middleware(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (user && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login')) {
+    // Redirect to onboarding if logged in (except for specific routes)
+    const isSetupPassword = request.nextUrl.pathname === '/onboardingpro/setup-password';
+
+    if (user && !isSetupPassword && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login')) {
         return NextResponse.redirect(new URL('/onboardingpro/step-1-identity', request.url))
     }
 

@@ -47,6 +47,39 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: inviteData.error }, { status: 403 });
         }
 
+        // 1.5 Create Placeholder in 'professionals' Table (CRITICAL FIX)
+        // This ensures the user exists for onboarding logic even before they log in.
+        // We use the email as a temporary anchor, or we wait for them to claim it.
+        // Actually, 'api_v1_invite_member' might NOT create a professional record.
+        // Let's force create it here to be safe and consistent with "Step 4 creates members".
+
+        // Check if exists first
+        const { data: existingPro } = await supabase
+            .from('professionals')
+            .select('id')
+            .eq('email', email)
+            .eq('organization_id', organization_id)
+            .maybeSingle();
+
+        if (!existingPro) {
+            const { error: proCreateError } = await supabase.from('professionals').insert({
+                organization_id: organization_id,
+                email: email,
+                first_name: first_name,
+                last_name: last_name,
+                role: targetRole,
+                job_title: 'Membre',
+                user_id: null // Will be linked on claim
+            });
+
+            if (proCreateError) {
+                console.error("DEBUG INSERT PROFESSIONALS:", proCreateError);
+                return NextResponse.json({
+                    error: "Database Error: Impossible de créer le membre (Professionals Table). " + proCreateError.message
+                }, { status: 500 });
+            }
+        }
+
         // 2. Trigger Auth Invite (Admin Client)
         const supabaseAdmin = createAdminClient();
 
@@ -58,7 +91,7 @@ export async function POST(request: Request) {
                 first_name: first_name,
                 last_name: last_name
             },
-            redirectTo: `${new URL(request.url).origin}/onboardingpro/setup-password`
+            redirectTo: `${new URL(request.url).origin}/auth/callback`
         });
 
         if (authError) {

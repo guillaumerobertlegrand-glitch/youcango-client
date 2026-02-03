@@ -34,7 +34,7 @@ function SetupPasswordContent() {
                 return;
             }
 
-            // 2. Check for Hash (Implicit) - Handled by onAuthStateChange partially, but we can force setSession if needed
+            // 2. Check for Hash (Implicit)
             const hash = window.location.hash;
             if (hash && hash.includes('access_token')) {
                 console.log("Hash detected.");
@@ -51,7 +51,7 @@ function SetupPasswordContent() {
             // 3. Check current session
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
-                console.log("Session found:", session.user.email);
+                console.log("SETUP-PASSWORD: Je suis chargé et je ne redirige pas");
                 setLoading(false);
             } else {
                 // Wait a bit for auto-recovery (onAuthStateChange) then stop loading
@@ -63,6 +63,7 @@ function SetupPasswordContent() {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' || session) {
+                console.log("SETUP-PASSWORD: Session détectée (onAuthStateChange) - Pas de redirection.");
                 setLoading(false);
             }
         });
@@ -91,6 +92,15 @@ function SetupPasswordContent() {
             setError(updateError.message);
             setLoading(false);
         } else {
+            // CRITICAL: Update Professionals Table (Source of Truth)
+            // We link the user_id to the professional record matching the email.
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+                await supabase.from('professionals')
+                    .update({ user_id: user.id, status: 'active' }) // Active status
+                    .eq('email', user.email);
+            }
+
             setStatus('success');
             setLoading(false);
         }

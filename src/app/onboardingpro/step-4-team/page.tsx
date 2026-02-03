@@ -165,7 +165,12 @@ export default function Step4TeamPage() {
         // We might want to encourage verifying info.
 
         const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', { p_step: 4, p_org_id: orgId });
-        if (result.valid) {
+
+        // Relaxed Validation: Allow proceed if Admin exists, even if members haven't accepted (all_equipped: false)
+        // We explicitly check if 'has_admin' is true in the details, or if valid is true.
+        const canProceed = result.valid || (result.details && result.details.has_admin === true);
+
+        if (canProceed) {
             await supabase.from('organizations').update({ onboarding_step: 5 }).eq('id', orgId);
             router.push("/onboardingpro/step-5-skills");
         } else {
