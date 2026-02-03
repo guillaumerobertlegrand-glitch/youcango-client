@@ -67,18 +67,17 @@ export async function signup(formData: FormData) {
         try {
             const admin = createAdminClient();
 
-            // Derive names from email
-            const namePart = email.split('@')[0];
-            // Split by dot, underscore or hyphen
-            const parts = namePart.split(/[._-]/);
-            const firstName = parts[0] || "New";
-            const lastName = parts.slice(1).join(" ") || "User";
+            // Retrieve Real Names from Form
+            const firstName = (formData.get("first_name") as string)?.trim() || "Utilisateur";
+            const lastName = (formData.get("last_name") as string)?.trim() || "";
+            // const fullName = `${firstName} ${lastName}`.trim();
 
             // Upsert mainly to avoid race conditions if a trigger does exist
             const { error: profileError } = await admin.from('profiles').upsert({
                 id: data.user.id,
-                first_name: firstName.charAt(0).toUpperCase() + firstName.slice(1),
-                last_name: lastName.charAt(0).toUpperCase() + lastName.slice(1),
+                first_name: firstName,
+                last_name: lastName,
+                // full_name: fullName, 
                 role: 'member',
                 // organization_id left null initially
             });

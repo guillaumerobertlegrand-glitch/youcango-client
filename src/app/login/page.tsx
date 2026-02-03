@@ -36,43 +36,41 @@ export default async function LoginPage(props: {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="space-y-6">
-                        <AuthForm />
+                    <AuthForm />
 
-
-                        <div className="relative py-2">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-gray-200" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white px-3 text-[#86868b] font-medium">
-                                    Ou continuer avec
-                                </span>
-                            </div>
+                    <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-gray-200" />
                         </div>
-
-                        <div className="flex flex-col gap-3">
-                            <form action={async () => {
-                                "use server"
-                                await loginWithProvider("google")
-                            }}>
-                                <Button
-                                    variant="outline"
-                                    className="w-full h-[50px] bg-white border border-[#d2d2d7] hover:bg-[#F5F5F7] hover:border-[#86868b] text-[#1d1d1f] font-medium text-[17px] rounded-[14px] relative transition-all"
-                                    type="submit"
-                                >
-                                    <svg className="mr-3 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
-                                    Google
-                                </Button>
-                            </form>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-white px-3 text-[#86868b] font-medium">
+                                Ou continuer avec
+                            </span>
                         </div>
                     </div>
-                </div>
 
-                {/* Footer */}
-                <div className="mt-8 text-center text-[13px] text-[#86868b]">
-                    <p>&copy; 2026 YouCanGo. Tous droits réservés.</p>
+                    <div className="flex flex-col gap-3">
+                        <form action={async () => {
+                            "use server"
+                            await loginWithProvider("google")
+                        }}>
+                            <Button
+                                variant="outline"
+                                className="w-full h-[50px] bg-white border border-[#d2d2d7] hover:bg-[#F5F5F7] hover:border-[#86868b] text-[#1d1d1f] font-medium text-[17px] rounded-[14px] relative transition-all"
+                                type="submit"
+                            >
+                                <svg className="mr-3 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+                                Google
+                            </Button>
+                        </form>
+                    </div>
                 </div>
             </div>
-            );
+
+            {/* Footer */}
+            <div className="mt-8 text-center text-[13px] text-[#86868b]">
+                <p>&copy; 2026 YouCanGo. Tous droits réservés.</p>
+            </div>
+        </div>
+    );
 }
