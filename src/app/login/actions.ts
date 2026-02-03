@@ -29,7 +29,7 @@ export async function login(formData: FormData) {
     }
 
     revalidatePath("/", "layout");
-    redirect("/onboardingpro");
+    redirect("/onboardingpro/step-1-identity");
 }
 
 export async function signup(formData: FormData) {
@@ -46,10 +46,28 @@ export async function signup(formData: FormData) {
         return redirect(`/login?error=${encodeURIComponent("Adresse email invalide. Veuillez vérifier le format.")}`);
     }
 
+    const emailRedirectTo = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`;
+    console.log("Signup parameters:", { email, emailRedirectTo });
+
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+            emailRedirectTo,
+        }
     });
+
+    // If we have a session, we are logged in (e.g. auto confirm enabled)
+    if (data?.session) {
+        revalidatePath("/", "layout");
+        return redirect("/onboardingpro/step-1-identity");
+    }
+
+    // If we have a user but no session, success but needs confirmation
+    if (data?.user) {
+        revalidatePath("/", "layout");
+        return redirect("/login?message=E-mail envoyé ! Validez-le pour continuer.");
+    }
 
     if (error) {
         console.error("Signup Error:", error);
@@ -62,29 +80,7 @@ export async function signup(formData: FormData) {
         return redirect(`/login?error=${encodeURIComponent(message)}`);
     }
 
-    // Force create profile immediately (fix for missing trigger/RLS issues)
-    if (data?.user) {
-        try {
-            const admin = createAdminClient();
-
-            // Upsert minimal profile (Names will be collected in Step 4)
-            const { error: profileError } = await admin.from('profiles').upsert({
-                id: data.user.id,
-                first_name: "", // Will be filled in Step 4
-                last_name: "",
-                role: 'member',
-            });
-
-            if (profileError) {
-                console.error("Profile Creation Failed:", profileError);
-            }
-        } catch (e) {
-            console.error("Profile Creation Exception:", e);
-        }
-    }
-
-    revalidatePath("/", "layout");
-    return redirect("/login?message=Un email de confirmation a été envoyé. Veuillez cliquer sur le lien pour continuer.");
+    return redirect("/login?error=Erreur inconnue lors de l'inscription");
 }
 
 export async function loginWithProvider(provider: "google" | "apple") {
