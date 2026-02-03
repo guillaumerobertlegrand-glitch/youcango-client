@@ -67,19 +67,12 @@ export async function signup(formData: FormData) {
         try {
             const admin = createAdminClient();
 
-            // Retrieve Real Names from Form
-            const firstName = (formData.get("first_name") as string)?.trim() || "Utilisateur";
-            const lastName = (formData.get("last_name") as string)?.trim() || "";
-            // const fullName = `${firstName} ${lastName}`.trim();
-
-            // Upsert mainly to avoid race conditions if a trigger does exist
+            // Upsert minimal profile (Names will be collected in Step 4)
             const { error: profileError } = await admin.from('profiles').upsert({
                 id: data.user.id,
-                first_name: firstName,
-                last_name: lastName,
-                // full_name: fullName, 
+                first_name: "", // Will be filled in Step 4
+                last_name: "",
                 role: 'member',
-                // organization_id left null initially
             });
 
             if (profileError) {

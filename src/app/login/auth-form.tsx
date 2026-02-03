@@ -24,27 +24,7 @@ export function AuthForm() {
         <div className="space-y-6">
             <form action={handleSubmit} className="space-y-5">
                 <div className="space-y-4">
-                    {/* Extra Fields for Signup */}
-                    {mode === 'signup' && (
-                        <div className="flex gap-3">
-                            <Input
-                                id="first_name"
-                                name="first_name"
-                                type="text"
-                                placeholder="Prénom"
-                                required
-                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] transition-all"
-                            />
-                            <Input
-                                id="last_name"
-                                name="last_name"
-                                type="text"
-                                placeholder="Nom"
-                                required
-                                className="h-[50px] bg-[#F5F5F7] border-0 rounded-[14px] px-4 text-[17px] text-[#1d1d1f] placeholder:text-[#86868b] focus-visible:ring-2 focus-visible:ring-[#007AFF] transition-all"
-                            />
-                        </div>
-                    )}
+
 
                     <Input
                         id="email"
