@@ -80,10 +80,41 @@ export default function ActiveSessionPage() {
     };
 
     const handleCompletion = async () => {
-        if (!sessionId) return;
+        if (!sessionId) {
+            console.error("[ActiveSession] Error: sessionId is null or undefined.");
+            return;
+        }
         setIsCompleting(true);
-        await supabase.rpc('api_v1_complete_session', { p_session_id: sessionId });
-        router.push(`/pro/completion?session_id=${sessionId}`);
+
+        console.log('[ActiveSession] Session ID envoyé:', sessionId);
+        console.log("[ActiveSession] Calling api_v1_complete_session with payload:", { p_session_id: sessionId });
+
+        try {
+            const { data, error } = await supabase.rpc('api_v1_complete_session', { p_session_id: sessionId });
+
+            if (error) {
+                console.error("[ActiveSession] RPC Error Full:", JSON.stringify(error, null, 2));
+                console.error("[ActiveSession] RPC Error Message:", error.message);
+                console.error("[ActiveSession] RPC Error Details:", error.details);
+                console.error("[ActiveSession] RPC Error Hint:", error.hint);
+                setIsCompleting(false);
+                return;
+            }
+
+            console.log("[ActiveSession] RPC Response:", data);
+
+            // Check for success flag in JSON response
+            if (data && (data as any).success) {
+                router.push(`/pro/completion?session_id=${sessionId}`);
+            } else {
+                console.error("[ActiveSession] Completion Failed (Business Logic):", data);
+                setIsCompleting(false);
+            }
+        } catch (err: any) {
+            console.error("[ActiveSession] Unexpected Exception:", JSON.stringify(err, null, 2));
+            console.error("[ActiveSession] Exception Message:", err.message);
+            setIsCompleting(false);
+        }
     };
 
     // 3. Merchant Auto-Complete Timer (Top-Level Hook)

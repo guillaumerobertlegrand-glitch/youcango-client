@@ -17,34 +17,51 @@ export default function ProDashboard() {
 
     const [demoInfo, setDemoInfo] = useState<{ orgName: string, proName: string } | null>(null);
 
-    // Check Onboarding Status
     useEffect(() => {
+        let mounted = true;
         async function checkStatus() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
 
-            const { data: pro } = await supabase
-                .from('professionals')
-                .select('first_name, last_name, organization:organizations(onboarding_status, official_name)')
-                .eq('user_id', user.id)
-                .single();
+                console.log("[ProDashboard] Fetching Pro profile for user:", user.id);
 
-            if (pro && pro.organization) {
-                // @ts-ignore
-                const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
+                const { data: pro, error } = await supabase
+                    .from('professionals')
+                    .select('first_name, last_name, organization:organizations(onboarding_status, official_name)')
+                    .eq('user_id', user.id)
+                    .single();
 
-                // Always set Info for the requested "Mode Démo" display
-                setDemoInfo({
-                    orgName: org.official_name || "Organisation Inconnue",
-                    proName: `${pro.first_name} ${pro.last_name || ''}`.trim()
-                });
-
-                if (org.onboarding_status !== 'completed') {
-                    setIsDemoMode(true);
+                if (error) {
+                    console.error("[ProDashboard] Fetch Error:", error);
+                    if (error.code === 'PGRST116') {
+                        console.warn("[ProDashboard] No professional profile found for this user.");
+                    }
+                    return;
                 }
+
+                if (mounted && pro && pro.organization) {
+                    // @ts-ignore
+                    const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
+
+                    console.log("[ProDashboard] Loaded Profile:", { org: org.official_name, pro: pro.first_name });
+
+                    // Always set Info for the requested "Mode Démo" display
+                    setDemoInfo({
+                        orgName: org.official_name || "Organisation Inconnue",
+                        proName: `${pro.first_name} ${pro.last_name || ''}`.trim()
+                    });
+
+                    if (org.onboarding_status !== 'completed') {
+                        setIsDemoMode(true);
+                    }
+                }
+            } catch (err: any) {
+                console.error("[ProDashboard] Unexpected Exception:", err);
             }
         }
         checkStatus();
+        return () => { mounted = false; };
     }, [supabase]);
 
     // Initial Load from LocalStorage
