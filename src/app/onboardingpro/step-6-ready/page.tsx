@@ -43,9 +43,15 @@ export default function Step6ReadyPage() {
         // But since 'api_v1_complete_onboarding' might transactionally fail, we might need a direct update if RPC fails on that strict rule.
 
         let success = data?.success;
-        if (!success && data?.steps?.step4?.details?.has_admin) {
+
+        // FIX: The RPC returns keys as strings "1", "2", "3", "4".
+        // We need to access data.steps['4'] specifically.
+        const step4Data = data?.steps?.['4'] || data?.steps?.step4;
+
+        if (!success && step4Data?.details?.has_admin) {
             // Admin exists, so we FORCE success for the admin's sake.
             // We manually set status to completed if the RPC was too strict.
+            console.log("BYPASS: Admin detected, ignoring all_equipped error.");
             await supabase.from('organizations').update({ onboarding_status: 'completed' }).eq('id', org.id);
             success = true;
         }
