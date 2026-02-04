@@ -250,18 +250,15 @@ export default function ClientHome({ initialStores, userEmail }: ClientHomeProps
                                                     </h3>
                                                 </div>
                                                 <div className="flex flex-col gap-0.5 mt-0.5">
+                                                    {/* Address (previously Category line) */}
                                                     <span className="text-[14px] text-slate-600 font-semibold leading-snug capitalize">
-                                                        {/* Role/Category or specific name if available */}
-                                                        {(selectedStore?.category || selectedStore?.business_type || 'Professional').replace('_', ' ')}
+                                                        {selectedStore?.address || selectedStore?.name || 'Location Details'}
                                                     </span>
-                                                    <span className="text-[13px] text-slate-400 font-medium leading-snug">
-                                                        {selectedStore?.address || 'Location Details'}
+
+                                                    {/* Phone (New Line) */}
+                                                    <span className="text-[13px] text-blue-600 font-medium mt-0.5">
+                                                        {selectedStore?.phone || "01 23 45 67 89"}
                                                     </span>
-                                                    {selectedStore?.phone && (
-                                                        <span className="text-[13px] text-blue-600 font-medium mt-1">
-                                                            {selectedStore.phone}
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>

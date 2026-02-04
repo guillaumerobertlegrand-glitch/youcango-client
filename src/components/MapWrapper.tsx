@@ -241,16 +241,18 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
                 const { data, error } = await Promise.race([rpcPromise, timeoutPromise]) as any;
 
-                console.log("[MapWrapper] RPC Response:", { data, error });
-
-                if (!isEffectAlive || !isComponentMounted.current) return;
-
                 if (error) {
                     console.error(`[C2 Search][${requestId}] RPC Error:`, error.message);
                 } else if (data) {
                     console.log("[MapWrapper] Setting stores:", data.length);
-                    // Filter out excluded merchants (Temporary Decline)
-                    const visibleStores = (data as Store[]).filter(s => !excludedMerchantIds.includes(s.id));
+                    // Filter out excluded merchants (Temporary Decline) & Add Mock Price
+                    const visibleStores = (data as Store[])
+                        .filter(s => !excludedMerchantIds.includes(s.id))
+                        .map((s, i) => ({
+                            ...s,
+                            price_range: ((s.name.length + i) % 5) + 1 // Deterministic Mock 1-5
+                        }));
+
                     setStores(visibleStores);
                     lastExecutionRef.current = currentParams;
                 }
@@ -791,16 +793,25 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                                     {index + 1}
                                 </div>
                                 <div className="flex flex-col pr-1 min-w-[60px]">
-                                    <span className="text-[13px] font-semibold tracking-tight text-slate-800 leading-none mb-0.5 group-hover:text-blue-600 transition-colors capitalize">
+                                    <span className="text-[13px] font-semibold tracking-tight text-slate-800 leading-none mb-0.5 group-hover:text-blue-600 transition-colors capitalize flex items-center gap-1">
                                         {/* Anonymized Name until Revealed */}
                                         {isRevealed ? store.name : (store.category || store.business_type).replace('_', ' ')}
                                     </span>
 
                                     {/* Specialty Label (For Restaurants etc) */}
                                     {store.specialty_label && (
-                                        <span className="text-[11px] font-semibold text-blue-600 leading-none mb-0.5 animate-in fade-in">
+                                        <span className="text-[11px] text-slate-500 font-medium leading-none mb-0.5">
                                             {store.specialty_label}
                                         </span>
+                                    )}
+
+                                    {/* Price Range (New Line) - Dark Gray */}
+                                    {store.price_range && (
+                                        <div className="flex items-center mt-0.5">
+                                            <span className="text-[11px] font-medium text-slate-600 tracking-widest">
+                                                {Array(store.price_range).fill('€').join('')}
+                                            </span>
+                                        </div>
                                     )}
 
                                     <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
