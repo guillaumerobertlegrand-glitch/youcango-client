@@ -192,44 +192,83 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
 
             try {
                 const viewerId = getOrCreateAnonymousId();
-                // Combine keywords, category, AND extracted_category for broader search
-                const searchKeywords = [...(intentData?.keywords || [])];
 
-                // Add the high-level type (e.g. 'service') if not present
-                if (intentData?.category && !searchKeywords.includes(intentData.category)) {
-                    searchKeywords.push(intentData.category);
+                // --- STRICT CATEGORY SEARCH LOGIC ---
+                let searchKeywords: string[] = [];
+                let strictBusinessType: string | null = null;
+
+                if (intentData?.category) {
+                    // 1. Strict Mode: Ignore user input, use mapped keywords from Category
+                    console.log("[MapWrapper] Strict Search Mode for:", intentData.category);
+
+                    switch (intentData.category) {
+                        case 'garage':
+                        case 'auto_maintenance':
+                            searchKeywords = ['garage', 'auto', 'mecanicien', 'pneu', 'mechanic'];
+                            strictBusinessType = 'service';
+                            break;
+                        case 'food_service':
+                        case 'restaurant':
+                            searchKeywords = ['restaurant', 'bistro', 'manger', 'food', 'dejeuner'];
+                            strictBusinessType = 'service'; // Assuming restaurants are services (tables)
+                            break;
+                        case 'hairdresser':
+                            searchKeywords = ['hair', 'coiffeur', 'barber', 'salon'];
+                            strictBusinessType = 'service';
+                            break;
+                        case 'beauty_salon':
+                            searchKeywords = ['beauty', 'esthetique', 'massage', 'soin'];
+                            strictBusinessType = 'service';
+                            break;
+                        case 'bakery':
+                            searchKeywords = ['bakery', 'boulangerie', 'pain'];
+                            strictBusinessType = 'merchant';
+                            break;
+                        case 'florist':
+                            searchKeywords = ['florist', 'fleuriste', 'fleurs'];
+                            strictBusinessType = 'merchant';
+                            break;
+                        case 'grocery':
+                            searchKeywords = ['grocery', 'supermarche', 'market'];
+                            strictBusinessType = 'merchant';
+                            break;
+                        default:
+                            // Fallback: Use the category name itself
+                            searchKeywords = [intentData.category];
+                            strictBusinessType = 'merchant'; // Default safety
+                    }
+                } else {
+                    // 2. Fallback Mode: Use User Keywords + extracted intent
+                    searchKeywords = [...(intentData?.keywords || [])];
+                    if (intentData?.extracted_category && !searchKeywords.includes(intentData.extracted_category)) {
+                        searchKeywords.push(intentData.extracted_category);
+                    }
                 }
 
-                // CRITICAL: Add the specific extracted type (e.g. 'restaurant') 
-                // This ensures "Table for 2" (kw='table') matches DB Category 'restaurant'
-                if (intentData?.extracted_category && !searchKeywords.includes(intentData.extracted_category)) {
-                    searchKeywords.push(intentData.extracted_category);
-                }
-
-                // Correct Category -> Business Type Mapping (Client-side Override)
-                // "Table for 2" (AI says 'service') -> DB needs 'merchant' for Restaurant
+                // Helper to resolve final BusinessType (Override if Strict set it)
                 const getBusinessType = (cat: string | undefined, extracted: string | undefined): string | null => {
+                    if (strictBusinessType) return strictBusinessType; // Priority to Strict Rule
+
                     const lowerExtracted = (extracted || '').toLowerCase();
                     const lowerCat = (cat || '').toLowerCase();
 
-                    // Explicit Mappings (Align with DB)
-                    // REMOVED 'restaurant' from merchant list as they are now services
                     if (['bakery', 'grocery', 'florist', 'bookstore', 'electronics'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
                         return 'merchant';
                     }
-                    // ADDED 'restaurant', 'mechanic' to service list
-                    if (['restaurant', 'hairdresser', 'barber', 'beauty_salon', 'doctor', 'plumber', 'taxi', 'mechanic', 'garage'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
+                    if (['restaurant', 'hairdresser', 'barber', 'beauty_salon', 'doctor', 'plumber', 'taxi', 'mechanic', 'garage', 'service'].some(k => lowerExtracted.includes(k) || lowerCat.includes(k))) {
                         return 'service';
                     }
-                    return cat || null; // Fallback to what AI said
+                    return cat || null;
                 };
 
                 const refinedBusinessType = getBusinessType(intentData?.category, intentData?.extracted_category);
 
+                console.log("[MapWrapper] Executing RPC with:", { refinedBusinessType, searchKeywords });
+
                 const rpcPromise = supabase.rpc('api_v1_get_merchants', {
                     p_lat: lat,
                     p_long: long,
-                    p_category: refinedBusinessType, // Use refined type
+                    p_category: refinedBusinessType,
                     p_keywords: searchKeywords,
                     p_radius_meters: 5000,
                     p_viewer_id: viewerId
