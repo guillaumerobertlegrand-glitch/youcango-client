@@ -39,11 +39,14 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Redirect to onboarding if logged in (except for specific routes)
+    // DISABLED FOR DEMO: We want to show the Landing Page even if logged in.
+    /*
     const isSetupPassword = request.nextUrl.pathname === '/onboardingpro/setup-password';
 
     if (user && !isSetupPassword && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login')) {
         return NextResponse.redirect(new URL('/onboardingpro/step-1-identity', request.url))
     }
+    */
 
     return response
 }

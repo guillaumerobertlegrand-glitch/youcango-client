@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const supabase = await createClient();
 
-  // Onboarding Check
-  const isProfileComplete = await checkProfileCompletion();
-  if (isProfileComplete === false) { // Explicit false check (null means not logged in)
-    redirect("/onboarding");
-  }
+  // Onboarding Check removed for Demo
+  // const isProfileComplete = await checkProfileCompletion();
+  // if (isProfileComplete === false) { 
+  //   redirect("/onboarding");
+  // }
 
   // Test Logic: Fetch stores around Paris (Hardcoded for demo)
   const { data: stores, error } = await supabase.rpc('find_nearby_stores', {
