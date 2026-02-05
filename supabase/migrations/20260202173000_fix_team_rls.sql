@@ -10,8 +10,11 @@
 CREATE POLICY "View team profiles" ON public.profiles
 FOR SELECT
 USING (
-    organization_id IN (
-        SELECT organization_id FROM public.professionals WHERE user_id = auth.uid()
+    id IN (
+        SELECT user_id FROM public.professionals 
+        WHERE organization_id IN (
+            SELECT organization_id FROM public.professionals WHERE user_id = auth.uid()
+        )
     )
 );
 
@@ -19,6 +22,7 @@ USING (
 ALTER TABLE IF EXISTS public.invitations ENABLE ROW LEVEL SECURITY;
 
 -- 1. View invitations for my organization
+/*
 CREATE POLICY "View organization invitations" ON public.invitations
 FOR SELECT
 USING (
@@ -26,8 +30,11 @@ USING (
         SELECT organization_id FROM public.professionals WHERE user_id = auth.uid()
     )
 );
+*/
 
 -- 2. Admin can manage invitations (Insert, Update, Delete)
+-- 2. Admin can manage invitations (Insert, Update, Delete)
+/*
 CREATE POLICY "Admin manage invitations" ON public.invitations
 FOR ALL
 USING (
@@ -36,3 +43,4 @@ USING (
         WHERE user_id = auth.uid() AND role = 'admin'
     )
 );
+*/

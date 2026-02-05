@@ -14,8 +14,9 @@ export default function Step3CatalogPage() {
     const [loading, setLoading] = useState(true);
     const [orgId, setOrgId] = useState<string | null>(null);
     const [apeCode, setApeCode] = useState<string | null>(null);
+    const [businessType, setBusinessType] = useState<string | null>(null);
 
-    // Mode: Restaurant
+    // Mode: Restaurant / Merchant
     const [priceRange, setPriceRange] = useState<number | null>(null);
     const [specialties, setSpecialties] = useState<any[]>([]);
     const [selectedSpecialty, setSelectedSpecialty] = useState<string>("");
@@ -32,7 +33,7 @@ export default function Step3CatalogPage() {
             if (!user) return router.push("/login");
 
             const { data: pro } = await supabase.from('professionals')
-                .select('organization_id, organization:organizations(ape_code, price_range, specialty_id)')
+                .select('organization_id, organization:organizations(ape_code, price_range, specialty_id, business_type)')
                 .eq('user_id', user.id)
                 .maybeSingle();
 
@@ -42,6 +43,7 @@ export default function Step3CatalogPage() {
                 const org = Array.isArray(pro.organization) ? pro.organization[0] : pro.organization;
                 if (org) {
                     setApeCode(org.ape_code);
+                    setBusinessType(org.business_type);
                     if (org.price_range) setPriceRange(org.price_range);
                     if (org.specialty_id) setSelectedSpecialty(org.specialty_id);
                 }
@@ -78,12 +80,17 @@ export default function Step3CatalogPage() {
     const fetchServices = async (oid: string) => {
         const { data } = await supabase.from('services').select('*').eq('organization_id', oid).eq('active', true);
         setServices(data || []);
-        // Only set loading false once we have everything we need logic-wise. 
-        // But here waiting for specialties is separate effect. 
         setLoading(false);
     };
 
-    const isRestaurant = apeCode?.replace('.', '').startsWith('56');
+    // Logic helpers
+    const cleanApe = apeCode?.replace('.', '') || '';
+    const isRestaurant = cleanApe.startsWith('56');
+    // FIX: Using business_type from DB directly as requested
+    const isPriceBased = (businessType === 'merchant' || businessType === 'restaurant' || isRestaurant);
+
+    // UI toggle match logic
+    const showSimpleProfile = isPriceBased;
 
     // --- Service Mode Logic ---
     const addService = async () => {
@@ -99,8 +106,6 @@ export default function Step3CatalogPage() {
         if (error) alert("Erreur: " + error.message);
         else {
             setNewTitle("");
-            // Keep previous duration/price as sticky defaults or reset?
-            // User likely adds similar services, keeping them is nice UX.
             fetchServices(orgId);
         }
     };
@@ -110,47 +115,49 @@ export default function Step3CatalogPage() {
         if (orgId) fetchServices(orgId);
     };
 
-    // --- Navigation & Validation ---
+    // --- Navigation & Validation (User Provided Logic) ---
     const handleNext = async () => {
         if (!orgId) return;
-        setLoading(true);
+        setLoading(true); // UI feedback
 
-        // For Restaurant: Save global settings first
-        if (isRestaurant) {
-            if (!priceRange) {
-                alert("Veuillez définir une gamme de prix.");
-                setLoading(false);
-                return;
-            }
-            if (!selectedSpecialty && specialties.length > 0) {
-                alert("Veuillez sélectionner une spécialité (type de cuisine).");
-                setLoading(false);
-                return;
-            }
+        // 2. Logique de validation ultra-robuste
+        // Validation : soit on a un prix (pour marchands/restos), soit on a des services (pour les autres)
+        const isValid = isPriceBased
+            ? (priceRange !== null && priceRange > 0)
+            : (services && services.length > 0);
 
-            const { error } = await supabase.from('organizations').update({
-                price_range: priceRange,
-                specialty_id: selectedSpecialty || null
-            }).eq('id', orgId);
-
-            if (error) {
-                alert("Erreur de sauvegarde: " + error.message);
-                setLoading(false);
-                return;
-            }
+        if (!isValid) {
+            alert(isPriceBased
+                ? "Veuillez sélectionner une gamme de prix (€) pour continuer."
+                : "Veuillez ajouter au moins une prestation à votre catalogue.");
+            setLoading(false);
+            return;
         }
 
-        // Validate via RPC
-        const { data: result } = await supabase.rpc('api_v1_validate_onboarding_step', {
-            p_step: 3,
-            p_org_id: orgId
-        });
+        try {
+            // 3. Mise à jour de l'étape (le await fonctionne ici car la fonction est async)
+            // Specialty is only for Restaurant strict (56) usually, but code didn't specify handling it.
+            // We will save valid specialty if it exists and is restaurant, otherwise null or ignore.
+            const updatePayload: any = {
+                onboarding_step: 4,
+                price_range: priceRange
+            };
 
-        if (result.valid) {
-            await supabase.from('organizations').update({ onboarding_step: 4 }).eq('id', orgId);
+            if (isRestaurant && selectedSpecialty) {
+                updatePayload.specialty_id = selectedSpecialty;
+            }
+
+            const { error } = await supabase
+                .from('organizations')
+                .update(updatePayload)
+                .eq('id', orgId);
+
+            if (error) throw error;
+
             router.push("/onboardingpro/step-4-team");
-        } else {
-            alert(isRestaurant ? "Veuillez remplir les informations requises." : "Vous devez créer au moins un service actif.");
+        } catch (err) {
+            console.error("Erreur lors de la sauvegarde :", err);
+            alert("Erreur technique lors de la sauvegarde.");
             setLoading(false);
         }
     };
@@ -166,43 +173,45 @@ export default function Step3CatalogPage() {
                 {/* Header */}
                 <header className="mt-10 px-6 mb-2">
                     <h1 className="text-[22px] font-bold text-black tracking-tight">
-                        {isRestaurant ? "Votre offre" : "Catalogue"}
+                        {showSimpleProfile ? "Votre offre" : "Catalogue"}
                     </h1>
                     <p className="text-[17px] text-[#000000] mt-2 leading-relaxed">
-                        {isRestaurant
+                        {showSimpleProfile
                             ? "Définissez le profil de votre établissement."
                             : "Ajoutez vos prestations pour continuer."}
                     </p>
                 </header>
 
-                {isRestaurant ? (
+                {showSimpleProfile ? (
                     <>
-                        <IOSSection title="Cuisine">
-                            {/* Native Select styled as Text */}
-                            <IOSRow label="Spécialité" separator={false}>
-                                <div className="relative w-full flex items-center justify-end">
-                                    <span className={cn(
-                                        "flex-1 text-right text-[17px] font-normal ml-auto",
-                                        selectedSpecialty ? "text-[#3C3C43]" : "text-[#8E8E93]"
-                                    )}>
-                                        {selectedSpecialty
-                                            ? specialties.find(s => s.id === selectedSpecialty)?.label_full
-                                            : "Choisir..."}
-                                    </span>
-                                    {/* Invisible Native Select for Interaction */}
-                                    <select
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
-                                        value={selectedSpecialty}
-                                        onChange={e => setSelectedSpecialty(e.target.value)}
-                                    >
-                                        <option value="" disabled>Choisir...</option>
-                                        {specialties.map(s => (
-                                            <option key={s.id} value={s.id}>{s.label_full}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </IOSRow>
-                        </IOSSection>
+                        {isRestaurant && (
+                            <IOSSection title="Cuisine">
+                                {/* Native Select styled as Text */}
+                                <IOSRow label="Spécialité" separator={false}>
+                                    <div className="relative w-full flex items-center justify-end">
+                                        <span className={cn(
+                                            "flex-1 text-right text-[17px] font-normal ml-auto",
+                                            selectedSpecialty ? "text-[#3C3C43]" : "text-[#8E8E93]"
+                                        )}>
+                                            {selectedSpecialty
+                                                ? specialties.find(s => s.id === selectedSpecialty)?.label_full
+                                                : "Choisir..."}
+                                        </span>
+                                        {/* Invisible Native Select for Interaction */}
+                                        <select
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                                            value={selectedSpecialty}
+                                            onChange={e => setSelectedSpecialty(e.target.value)}
+                                        >
+                                            <option value="" disabled>Choisir...</option>
+                                            {specialties.map(s => (
+                                                <option key={s.id} value={s.id}>{s.label_full}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </IOSRow>
+                            </IOSSection>
+                        )}
 
                         <IOSSection title="Gamme de prix">
                             <div className="p-4 flex flex-col gap-3">
@@ -301,7 +310,7 @@ export default function Step3CatalogPage() {
                     <Button
                         onClick={handleNext}
                         className="w-full bg-[#007AFF] hover:bg-[#007AFF]/90 text-white font-bold text-[17px] h-12 rounded-[16px]"
-                        disabled={loading || (!isRestaurant && services.length === 0)}
+                        disabled={loading || (!showSimpleProfile && services.length === 0)}
                     >
                         {loading ? <Loader2 className="animate-spin mr-2" /> : "Continuer"}
                     </Button>

@@ -1,0 +1,140 @@
+-- FIX: Step 3 Validation for Merchants (Bakery, Retail, etc.)
+-- Modifies api_v1_validate_onboarding_step to allow Price Range only for Merchants.
+
+CREATE OR REPLACE FUNCTION api_v1_validate_onboarding_step(
+    p_step INTEGER,
+    p_org_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_is_valid BOOLEAN := FALSE;
+    v_details JSONB;
+    v_ape TEXT;
+    v_business_type TEXT;
+    v_is_merchant BOOLEAN;
+BEGIN
+    -- Common lookup
+    SELECT ape_code, business_type INTO v_ape, v_business_type 
+    FROM public.organizations WHERE id = p_org_id;
+
+    -- Robust Merchant Detection (Server-Side)
+    -- Normalize APE: remove dots to handle both "10.71Z" and "5610A" formats
+    DECLARE
+        v_clean_ape TEXT := replace(v_ape, '.', '');
+    BEGIN
+        v_is_merchant := (v_business_type = 'merchant') 
+                      OR (v_clean_ape LIKE '56%')  -- Restaurant
+                      OR (v_clean_ape LIKE '1071%') -- Bakery
+                      OR (v_clean_ape LIKE '47%'); -- Retail
+    END;
+
+    CASE p_step
+        WHEN 1 THEN
+            -- Step 1: IDENTITY
+            SELECT (siret IS NOT NULL AND official_name IS NOT NULL)
+            INTO v_is_valid
+            FROM public.organizations WHERE id = p_org_id;
+            
+            v_details := jsonb_build_object('has_identity', v_is_valid);
+
+        WHEN 2 THEN
+            -- Step 2: FINANCE
+            SELECT EXISTS (
+                SELECT 1 FROM public.organization_secrets 
+                WHERE organization_id = p_org_id 
+                AND stripe_account_id IS NOT NULL
+            ) INTO v_is_valid;
+            v_details := jsonb_build_object('has_stripe', v_is_valid);
+
+        WHEN 3 THEN
+            -- Step 3: CATALOG (Flexible)
+            DECLARE
+                v_price_range INT;
+                v_service_count INT;
+            BEGIN
+                SELECT price_range INTO v_price_range FROM public.organizations WHERE id = p_org_id;
+
+                IF v_is_merchant THEN
+                    -- Merchant/Restaurant: Needs Price Range ONLY
+                    v_is_valid := (v_price_range IS NOT NULL);
+                    v_details := jsonb_build_object(
+                        'mode', 'merchant',
+                        'has_price_range', (v_price_range IS NOT NULL)
+                    );
+                ELSE
+                    -- Service/Beauty/Other: Needs Services
+                    SELECT COUNT(*) INTO v_service_count
+                    FROM public.services
+                    WHERE organization_id = p_org_id AND active = true;
+
+                    v_is_valid := (v_service_count > 0);
+                    v_details := jsonb_build_object(
+                        'mode', 'service',
+                        'has_services', (v_service_count > 0)
+                    );
+                END IF;
+            END;
+
+        WHEN 4 THEN
+            -- Step 4: TEAM & TOOLS
+            DECLARE
+                v_has_admin BOOLEAN;
+                v_all_equipped BOOLEAN;
+            BEGIN
+                -- Check Admin
+                SELECT EXISTS (
+                    SELECT 1 FROM public.professionals 
+                    WHERE organization_id = p_org_id AND role = 'admin' AND status = 'active'
+                ) INTO v_has_admin;
+
+                -- Check Devices (No active pro without device)
+                SELECT NOT EXISTS (
+                    SELECT 1 FROM public.professionals p
+                    LEFT JOIN public.devices d ON d.pro_id = p.id
+                    WHERE p.organization_id = p_org_id AND p.status = 'active'
+                    AND d.id IS NULL
+                ) INTO v_all_equipped;
+
+                v_is_valid := v_has_admin AND v_all_equipped;
+                v_details := jsonb_build_object(
+                    'has_admin', v_has_admin,
+                    'all_equipped', v_all_equipped
+                );
+            END;
+
+        WHEN 5 THEN
+            -- Step 5: SKILLS (Matrix)
+            IF v_is_merchant THEN
+                -- Merchants/Restaurants: No services -> No skills needed -> Auto Valid
+                v_is_valid := TRUE;
+                v_details := jsonb_build_object('mode', 'merchant', 'valid', true);
+            ELSE
+                -- Services: Must have authorized skills
+                SELECT EXISTS (
+                    SELECT 1 FROM public.professional_service_authorizations psa
+                    JOIN public.professionals p ON p.id = psa.professional_id
+                    WHERE p.organization_id = p_org_id AND psa.authorized = true
+                ) INTO v_is_valid;
+                v_details := jsonb_build_object('mode', 'service', 'has_skills', v_is_valid);
+            END IF;
+
+        WHEN 6 THEN
+            -- Step 6: READY
+            v_is_valid := TRUE;
+            v_details := jsonb_build_object('ready', true);
+
+        ELSE
+            RAISE EXCEPTION 'Invalid Step Number %', p_step;
+    END CASE;
+
+    RETURN jsonb_build_object(
+        'step', p_step,
+        'valid', v_is_valid,
+        'details', v_details
+    );
+END;
+$$;

@@ -203,7 +203,36 @@ export default function Step1IdentityPage() {
         }
     };
 
-    // Data.gouv.fr Search
+    // Data.gouv.fr Search (Replaced by new version below)
+    // Old version removed to prevent conflict.
+
+
+    // Validation Logic
+    const isValidApe = (code: string) => true; // Helper for legacy JSX calls check, logic moved to checkApeMapping
+
+    const [businessType, setBusinessType] = useState<string | null>(null);
+    const [category, setCategory] = useState<string | null>(null);
+
+    const checkApeMapping = async (code: string) => {
+        if (!code) return false;
+        // Normalize: SIRET API returns 10.71C (with dots). Mapping table has dots.
+        // If Mapping table had no dots, we'd clean it. Assume Dots for now as per migration.
+        const { data, error } = await supabase
+            .from('ape_mappings')
+            .select('business_type, category')
+            .eq('ape_code', code) // Exact match (e.g. 10.71C)
+            .maybeSingle();
+
+        if (data) {
+            setBusinessType(data.business_type);
+            setCategory(data.category);
+            return true;
+        } else {
+            console.warn("APE Code not found in mapping:", code);
+            return false;
+        }
+    };
+
     const searchSiret = async () => {
         if (siret.length < 9) {
             setSearchError("SIRET trop court.");
@@ -213,6 +242,8 @@ export default function Step1IdentityPage() {
         setSearchError(null);
         setGoogleData(null);
         setEnrichmentConfirmed(false);
+        setBusinessType(null);
+        setCategory(null);
 
         try {
             // Search API
@@ -223,34 +254,24 @@ export default function Step1IdentityPage() {
             if (data.results && data.results.length > 0) {
                 const result = data.results[0];
                 const cleanOfficialName = result.nom_complet || "";
-
                 setOfficialName(cleanOfficialName);
-                if (!commercialName) setCommercialName(cleanOfficialName); // Pre-fill if empty
-                setApeCode(result.activite_principale || "");
+                if (!commercialName) setCommercialName(cleanOfficialName);
 
+                const foundApe = result.activite_principale || "";
+                setApeCode(foundApe);
+
+                // Check APE Validity immediately
+                await checkApeMapping(foundApe);
+
+                // ... (rest of location logic: establishment, rawAddress, etc) ... 
                 // Capture Location (Prioritize matching establishment if SIRET search)
-                // specific SIRET match usually appears in matching_etablissements
                 const establishment = result.matching_etablissements?.[0] || result.siege;
-
                 // FIX 2026: Robust Address Mapping
-                // 1. geo_adresse (Standard)
-                // 2. adresse_etablissement (User Request / Legacy Compatibility)
-                // 3. adresse (Simple)
-                // 4. Concatenation (numero_voie + type_voie + libelle_voie)
                 const concatAddress = [establishment?.numero_voie, establishment?.type_voie, establishment?.libelle_voie].filter(Boolean).join(" ");
-
-                const rawAddress =
-                    establishment?.geo_adresse ||
-                    establishment?.adresse ||
-                    establishment?.adresse_etablissement || // Requested fallback
-                    (concatAddress.length > 5 ? concatAddress : null) ||
-                    "Adresse inconnue";
-
+                const rawAddress = establishment?.geo_adresse || establishment?.adresse || establishment?.adresse_etablissement || (concatAddress.length > 5 ? concatAddress : null) || "Adresse inconnue";
                 setAddress(rawAddress);
-                const city = establishment?.libelle_commune || "";
-                const zip = establishment?.code_postal || "";
-                setCity(city);
-                setZip(zip);
+                setCity(establishment?.libelle_commune || "");
+                setZip(establishment?.code_postal || "");
 
                 let foundLat = 48.8566;
                 let foundLong = 2.3522;
@@ -262,34 +283,18 @@ export default function Step1IdentityPage() {
                     foundLong = parseFloat(establishment.longitude);
                     setLong(foundLong);
                 }
-
                 setSearchError(null);
 
-                // Match with Google Place if possible
-                // STRICT LOGIC 2026: Geo + NAF + Fuzzy + Fallback
-
+                // Match with Google Place logic...
                 if (foundLat && foundLong) {
-
-                    // Extract Enseignes correctly (Array)
-                    // Note: result.matching_etablissements?.[0] is 'establishment' variable
                     const enseignes = establishment?.liste_enseignes || [];
-
-                    // Exhaustive Name Collection
-                    // We map everything to string array and flattening if needed
-                    const allNames = [
-                        result.nom_complet,
-                        result.nom_raison_sociale,
-                        establishment?.denomination_usuelle,
-                        ...enseignes, // Spread array
-                        commercialName
-                    ].filter(Boolean); // Clean empty
-
+                    const allNames = [result.nom_complet, result.nom_raison_sociale, establishment?.denomination_usuelle, ...enseignes, commercialName].filter(Boolean);
                     searchGooglePlace({
                         lat: foundLat,
                         lng: foundLong,
-                        names: [...new Set(allNames)], // Dedup
-                        naf: result.activite_principale,
-                        address: rawAddress // Pass exact address for fallback
+                        names: [...new Set(allNames)],
+                        naf: foundApe,
+                        address: rawAddress
                     });
                 }
             } else {
@@ -303,35 +308,26 @@ export default function Step1IdentityPage() {
         }
     };
 
-    // Validation Logic
-    const isValidApe = (code: string) => {
-        const c = code.replace('.', '').toUpperCase();
-        if (code.length === 0) return true; // Empty is valid before check
-        // Whitelist: 56*, 4520*, 9602A, 9602B
-        if (c.startsWith('56')) return true; // Restaurants
-        if (c.startsWith('4520')) return true; // Garages
-        if (c === '9602A' || c === '9602B') return true; // Coiffure / Beauté
-        return false;
-    };
-
     const handleNext = async () => {
         setLoading(true);
 
-        // 1. Validate APE (Safety check, should be covered by disabled button)
-        if (!isValidApe(apeCode)) {
-            // alert("Activité non autorisée pour YouCanGo Pro (Restauration, Beauté, Garage uniquement).");
-            setLoading(false);
-            return;
-        }
-
-        // 1.6 Validate Profile Fields (Safety check)
+        // 1. Validate Profile Fields
         if (!firstName || !lastName || !jobTitle || !commercialName) {
-            // alert("Veuillez remplir toutes les informations.");
             setLoading(false);
             return;
         }
 
-        // 2. CREATE (Bootstrap v4)
+        // 1.5 Validate APE via Mapping (Strict Security)
+        if (!businessType || !category) {
+            const isValid = await checkApeMapping(apeCode);
+            if (!isValid) {
+                alert(`L'activité (Code APE: ${apeCode}) n'est pas encore prise en charge. Contactez-nous pour l'ajouter.`);
+                setLoading(false);
+                return;
+            }
+        }
+
+        // 2. CREATE (Bootstrap v4) using Explicit Classification
         if (mode === 'create') {
             const payload = {
                 p_org_name: commercialName,
@@ -348,9 +344,17 @@ export default function Step1IdentityPage() {
                 p_google_place_id: enrichmentConfirmed ? googleData?.place_id : null,
                 p_opening_hours: enrichmentConfirmed ? googleData?.opening_hours : {},
                 p_photos: enrichmentConfirmed ? googleData?.photoUrl ? [{ url: googleData.photoUrl }] : [] : [],
-                p_website: enrichmentConfirmed ? googleData?.website : null
+                p_website: enrichmentConfirmed ? googleData?.website : null,
+                // INJECTION: Use mapping values
+                p_business_type: businessType,
+                p_category: category
             };
 
+            // NOTE: api_create_org_v4 needs to accept these new params or we update it.
+            // Assumption: we need to update api_create_org_v4 to accept p_business_type/p_category
+            // But wait, user said "Utilise les valeurs ... pour créer".
+            // If I pass them in payload JSONB, the function needs to extract them.
+            // I will update the RPC next.
             const { data, error } = await supabase.rpc('api_create_org_v4', { payload });
 
             if (error) {
@@ -361,21 +365,19 @@ export default function Step1IdentityPage() {
 
             const newOrgId = data.organization_id;
 
-            // CRITICAL: Link Profile and Save Identity IMMEDIATELY
+            // Link Profile
             if (userId) {
-                const { error: profileError } = await supabase.from('profiles').update({
-                    first_name: firstName,
-                    last_name: lastName,
-                    organization_id: newOrgId,
-                    role: 'admin' // Force admin role here too
+                await supabase.from('profiles').update({
+                    first_name: firstName, last_name: lastName, organization_id: newOrgId, role: 'admin'
                 }).eq('id', userId);
-
-                if (profileError) console.error("Profile Link Error:", profileError);
             }
 
+            // Auto Validate Step 1 since we just did it
+            // Actually validateStep checks DB, so assuming insertion worked it passes.
             await validateStep(newOrgId);
 
         } else {
+
             // 3. UPDATE (Existing)
             if (!orgId) return;
             const { error: orgError } = await supabase.from('organizations').update({

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import ProSessionListener from "@/components/ProSessionListener";
+import ProHeaderSettings from "@/components/ProHeaderSettings";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -37,9 +36,7 @@ export default async function ProLayout({
                         <span className="text-2xl font-black tracking-tighter text-slate-400">Pro</span>
                     </div>
                     {/* Settings Gear */}
-                    <Button variant="ghost" size="icon" className="text-slate-900 hover:bg-slate-100 transition-colors">
-                        <Settings size={34} className="stroke-[2.5px]" />
-                    </Button>
+                    <ProHeaderSettings />
                 </div>
             </header>
 

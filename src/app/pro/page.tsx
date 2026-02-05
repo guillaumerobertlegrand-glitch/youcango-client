@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Switch } from "@/components/ui/switch";
 import { createClient } from "@/utils/supabase/client";
 
+
 // Mock Pro & Org Data (Ideally fetched from context/backend)
 const PRO_ORG_LOCATION = { lat: 48.8566, lng: 2.3522 }; // Seed data location
 const ALLOWED_RADIUS_METERS = 200; // Tolerance
@@ -125,12 +126,21 @@ export default function ProDashboard() {
         return R * c;
     };
 
+
+
+    // Actions (imported dynamically or redefined to avoid large imports if simple)
+    // We import the server action for signout
+    // Note: In client component we need to wrap the action or use a form.
+    // Since 'signout' is imported from "@/app/login/actions", let's import it at top.
+
     return (
         <div className="flex flex-col items-center justify-center min-h-full p-6 space-y-8 w-full animate-in fade-in duration-700 bg-white relative">
 
+
+
             {/* Demo Banner - ALWAYS VISIBLE if info present (Requested) */}
             {demoInfo && (
-                <div className="absolute top-0 w-full bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-semibold py-1.5 px-4 text-center border-b border-slate-100">
+                <div className="absolute top-0 w-full bg-slate-50 text-slate-500 text-[10px] uppercase tracking-widest font-semibold py-1.5 px-4 text-center border-b border-slate-100 mt-12 md:mt-0">
                     Mode Démo : {demoInfo.orgName} • {demoInfo.proName}
                 </div>
             )}
