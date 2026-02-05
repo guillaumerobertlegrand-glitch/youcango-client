@@ -844,8 +844,8 @@ const MapWrapper = forwardRef<any, MapWrapperProps>(({
                                         </span>
                                     )}
 
-                                    {/* Price Range (New Line) - Dark Gray */}
-                                    {store.price_range && (
+                                    {/* Price Range (New Line) - Dark Gray - ONLY FOR SERVICES */}
+                                    {store.business_type === 'service' && store.price_range && (
                                         <div className="flex items-center mt-0.5">
                                             <span className="text-[11px] font-medium text-slate-600 tracking-widest">
                                                 {Array(store.price_range).fill('€').join('')}

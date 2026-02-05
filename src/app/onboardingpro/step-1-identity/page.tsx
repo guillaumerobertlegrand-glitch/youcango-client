@@ -232,7 +232,20 @@ export default function Step1IdentityPage() {
                 // specific SIRET match usually appears in matching_etablissements
                 const establishment = result.matching_etablissements?.[0] || result.siege;
 
-                const rawAddress = establishment?.geo_adresse || establishment?.adresse || "Adresse inconnue";
+                // FIX 2026: Robust Address Mapping
+                // 1. geo_adresse (Standard)
+                // 2. adresse_etablissement (User Request / Legacy Compatibility)
+                // 3. adresse (Simple)
+                // 4. Concatenation (numero_voie + type_voie + libelle_voie)
+                const concatAddress = [establishment?.numero_voie, establishment?.type_voie, establishment?.libelle_voie].filter(Boolean).join(" ");
+
+                const rawAddress =
+                    establishment?.geo_adresse ||
+                    establishment?.adresse ||
+                    establishment?.adresse_etablissement || // Requested fallback
+                    (concatAddress.length > 5 ? concatAddress : null) ||
+                    "Adresse inconnue";
+
                 setAddress(rawAddress);
                 const city = establishment?.libelle_commune || "";
                 const zip = establishment?.code_postal || "";
@@ -476,6 +489,16 @@ export default function Step1IdentityPage() {
                             placeholder="Nom affiché"
                             value={commercialName}
                             onChange={e => setCommercialName(e.target.value)}
+                        />
+                    </IOSRow>
+
+                    {/* Address (Editable) - FIX 2026: Expose Address to User */}
+                    <IOSRow label="Adresse">
+                        <input
+                            className="text-right text-[17px] bg-transparent outline-none text-[#3C3C43] placeholder:text-[#c7c7cc] w-full font-normal"
+                            placeholder="Adresse complète"
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
                         />
                     </IOSRow>
 
